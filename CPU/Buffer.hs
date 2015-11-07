@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-module Buffer () where
+module CPU.Buffer (Buffer, empty, insert, insert', full, take, intStats) where
 
-import CLaSH.Prelude hiding (drop) 
+import CLaSH.Prelude hiding (drop, empty, take) 
 import Text.Printf (printf)
 import qualified Prelude as P
 
@@ -19,10 +19,10 @@ instance KnownNat n => Enum (Count n) where
     fromEnum (Count n) = 1 + fromEnum n
 
 full :: KnownNat n => Buffer n a -> Bool
-full (Buffer count _) = count == Count maxCount
+full buf@(Buffer count _) = count == maxCount buf
 
 maxCount :: KnownNat n => Buffer n a -> Count n
-maxCount = Count maxBound
+maxCount _ = Count maxBound
 
 count :: KnownNat n => Buffer n a -> Count n
 count (Buffer c _) = c
@@ -39,13 +39,16 @@ instance (Show a, KnownNat n) => Show (Buffer n a) where
         format (Count 0) [x] = show x
         format count (x : xs) = show x P.++ ", " P.++ format (pred count) xs
 
+intStats :: (KnownNat n) => Buffer n a -> (Int, Int)
+intStats buf = (fromEnum (maxCount buf), fromEnum (count buf))
+
 empty :: (KnownNat n) => Buffer n a
 empty = Buffer Empty (repeat undefined)
 
 -- Force insertion, no overflow check
 insert' :: (KnownNat n) => Buffer n a -> a -> Buffer n a
-insert (Buffer count vec) | full buf  = error "Inserting into full buffer" 
-                          | otherwise = Buffer (succ count) (replace count a vec)
+insert' buf@(Buffer count vec) a | full buf  = error "Inserting into full buffer" 
+                               a | otherwise = Buffer (succ count) (replace count a vec)
 
 insert :: (KnownNat n) => Buffer n a -> a -> Buffer n a
 insert buf@(Buffer count vec) a = if full buf

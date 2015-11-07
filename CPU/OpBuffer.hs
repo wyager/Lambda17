@@ -1,23 +1,23 @@
-module OpBuffer () where
+module CPU.OpBuffer (OpBuffer, insert, take) where
 
-import CLaSH.Prelude
+import CLaSH.Prelude hiding (take)
 import qualified CPU.Buffer as Buf
-import CPU.InstructionSet (Instruction)
-import CPU.Op (Op)
+import CPU.Op (Op, Fetched(..))
+import CPU.Defs (PC, Predicted(..), RIx)
 
-data InstBuffer n = IB {fetch_pc :: PC, buf :: Buffer n (Fetched Op)}
+data OpBuffer n = IB {fetch_pc :: PC, buf :: Buf.Buffer n (Fetched (Op RIx))}
 
-empty :: InstBuffer n
+empty :: KnownNat n => OpBuffer n
 empty = IB 0 Buf.empty
 
-insert :: InstBuffer n -> Fetched Op -> InstBuffer n
-insert ib@(IB _ buf)        _ | full buf       = ib -- Can't insert anything!
-insert ib@(IB fetch_pc buf) (Fetched pc (Predicted pc') op)
-                              | pc == fetch_pc = IB pc' (Buf.insert' buf op)
+insert :: KnownNat n => OpBuffer n -> Fetched (Op RIx) -> OpBuffer n
+insert ib@(IB _ buf)        _ | Buf.full buf   = ib -- Can't insert anything!
+insert ib@(IB fetch_pc buf) fetched@(Fetched pc (Predicted pc') _)
+                              | pc == fetch_pc = IB pc' (Buf.insert' buf fetched)
                               | otherwise      = ib -- Incorrect fetch!
 
 -- Don't touch fetch_pc. Only an insert should do that.
-take :: InstBuffer (n+1) -> (InstBuffer (n+1), Maybe (Fetched Op))
+take :: KnownNat (n+1) => OpBuffer (n+1) -> (OpBuffer (n+1), Maybe (Fetched (Op RIx)))
 take (IB fetch_pc buf) = let (buf', result) = Buf.take buf 
                          in (IB fetch_pc buf', result)
 

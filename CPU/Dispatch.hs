@@ -1,15 +1,25 @@
-module Dispatch () where
+{-# LANGUAGE ScopedTypeVariables #-}
 
+module CPU.Dispatch () where
+
+import CLaSH.Prelude hiding (take)
 import Data.Maybe (fromJust)
+import CPU.Defs (RVal(Pending, Literal), RIx, Predicted(..), StationID(..))
+import CPU.Op (Fetched(..), Op(..))
+import CPU.RegisterFile (RegisterFile, renameReg, copyFrom)
+import CPU.OpBuffer (OpBuffer, take)
+import CPU.RStations (RStations, freeSlot, insert)
+import CPU.ReorderBuffer (ROB, oneFree, twoFree, waitFor)
 
-data DistpatchState n f s d = DS (InstBuffer (n+1)) (RegisterFile f s) (RStations f s) (ROB d)
+data DistpatchState n f s d = DS (OpBuffer (n+1)) (RegisterFile f s) (RStations f s) (ROB d f s)
 
 -- We return left if it failed, right if it succeeded. This way,
 -- we can write a do-expression to update dispatch with multiple instructions
 -- and we don't try to pull too many.
-dispatch :: (KnownNat (n+1), KnownNat f, KnownNat s)
+dispatch :: (KnownNat (n+1), KnownNat f, KnownNat s, KnownNat d)
          => (Op (StationID f s) -> Index f) 
-         -> Either (DistpatchState n f s) (DistpatchState n f s)
+         -> DistpatchState n f s d
+         -> Either (DistpatchState n f s d) (DistpatchState n f s d)
 dispatch select state@(DS insts regs stations rob) = case take insts of
     (_, Nothing)      -> Left state
     (insts', Just fetched@(Fetched pc pred (Ldr a b r))) -> 
@@ -32,10 +42,10 @@ dispatch select state@(DS insts regs stations rob) = case take insts of
         thereIsLdSpace | (Just _) <- ldSlot = True
                        | Nothing  <- ldSlot = False
         ldStation = StationID ldFu (fromJust ldSlot)
-        regs' = renameReg r ldStation
+        regs' = renameReg r ldStation regs
         stations' = insert addStation fakeAdd $ insert ldStation fakeLd $ stations
         rob' = waitFor (Fetched pc (Predicted pc  ) fakeLd)  ldStation  $ 
-               waitFor (Fetched pc (Predicted pred) fakeAdd) addStation $ rob
+               waitFor (Fetched pc pred             fakeAdd) addStation $ rob
     (insts', Just fetched@(Fetched pc pred op)) ->
         if thereIsSpace && thereIsRobSpace
             then Right $ DS insts' regs' stations' rob'
@@ -55,23 +65,9 @@ dispatch select state@(DS insts regs stations rob) = case take insts of
             Ld  _   r -> overwrite r
             Jeq _ _ _ -> regs
             Jmp _     -> regs
-        overwrite r = rename r opStation regs
-        rob' = waitFor fetched opStation rob
+        overwrite r = renameReg r opStation regs
+        rob' = waitFor (Fetched pc pred op') opStation rob
 
-
-copyFrom :: forall f s . RegisterFile f s -> Op RIx -> Op (StationID f s)
-copyFrom (RegFile regs) op = case op of
-        Halt      -> Halt
-        Jmp pc    -> Jmp pc
-        Mov w r   -> Mov w                     r
-        Add a b r -> Add (update a) (update b) r
-        Ld a r    -> Ld  (update a)            r
-        Ldr a b r -> Ldr (update a) (update b) r
-        Jeq a b p -> Jeq (update a) (update b) p 
-    where
-    update :: RVal RIx -> RVal (StationID f s)
-    update (Literal w)   = Literal w
-    update (Pending rix) = regs !! rix
 
 
 

@@ -1,6 +1,7 @@
-module CPU.InstructionSet () where
+module CPU.InstructionSet (Instruction(..), FetchedInstruction(..)) where
 
-import CPU.Defs(W(..))
+import CPU.Defs(W(..), RIx(..), PC(..), Addr(..))
+import CLaSH.Prelude 
 
 data FetchedInstruction = Fetched Instruction PC
 

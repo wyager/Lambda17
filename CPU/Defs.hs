@@ -1,39 +1,27 @@
-module CPU.Defs (W(..), RIx(..)) where
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
+module CPU.Defs (W(..), RIx(..), PC(..), Addr(..), Predicted(..), RVal(..), StationID(..)) where
 
 import CLaSH.Prelude
 
-data W = W {w :: BitVector 16} deriving (Num, Ord, Eq)
+newtype W = W {w :: BitVector 16} deriving (Num, Ord, Eq)
 
-data PC = PC {pc :: BitVector 16} deriving (Num, Ord, Eq)
+newtype PC = PC {pc :: BitVector 16} deriving (Num, Ord, Eq)
 
-data RIx = RIx {rIx :: Index 16} deriving (Num, Ord, Eq)
+newtype RIx = RIx {rIx :: Index 16} deriving (Num, Enum, Ord, Eq)
 
-data Addr = Addr {addrOf :: BitVector 16}
+newtype Addr = Addr {addrOf :: BitVector 16} deriving (Ord, Eq)
 
-data Predicted a = Predicted a
+newtype Predicted a = Predicted a deriving (Show)
 
 -- The register representation inside instructions.
 -- rix is RIx (pre-dispatch) or StationID (post-dispatch)
 -- Also used inside the register file, so we can copy it directly from
 -- there to ops before putting them in registration stations
-data RVal rix = Pending rix | Literal W
+data RVal rix = Pending rix | Literal W deriving (Eq)
 
 -- Used instead of RIx post-dispatch
-data StationID fus stations = StationID (Index fus) (Index stations)
-
-
-
-
-
--- Indended use: Like `Either x x` under `>>`
--- If there's a terminal value, it "wipes out" all
--- the nonterminals to the right of it
-data Terminal x = Terminal x | Nonterminal x
-
-instance Semigroup (Terminal x) where
-    (Nonterminal _) <> x = x
-    (Terminal x)    <> _ = Terminal x
-
+data StationID fus stations = StationID (Index fus) (Index stations) deriving (Eq)
 
 data Read = NoRead | Read Addr
 data Fetch = NoFetch | Fetch Addr
