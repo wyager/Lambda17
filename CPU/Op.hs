@@ -1,4 +1,4 @@
-module CPU.Op (Fetched(..), Op(..)) where
+module CPU.Op (Fetched(..), Op(..), grounded) where
 
 import CLaSH.Prelude 
 import CPU.Defs (PC(..), Predicted(..), RIx(..), RVal(..), W(..), Addr(..), StationID(..))
@@ -17,7 +17,7 @@ data Op rix = Mov W RIx
             | Jeq (RVal rix) (RVal rix) PC
             deriving (Eq, Show)
 
-grounded :: Op (StationID f s) -> Bool
+grounded :: Op a -> Bool
 grounded op = case op of
     Mov _ _                       -> True
     Add (Literal _) (Literal _) _ -> True

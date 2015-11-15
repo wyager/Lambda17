@@ -1,8 +1,11 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module CPU.Defs (W(..), RIx(..), PC(..), Addr(..), Predicted(..), RVal(..), StationID(..), RobID(..)) where
+module CPU.Defs (
+    W(..), RIx(..), PC(..), Addr(..), 
+    Predicted(..), RVal(..), StationID(..), 
+    RobID(..), Read(..), MemRead(..)) where
 
-import CLaSH.Prelude
+import CLaSH.Prelude hiding (Read)
 import Text.Printf (printf)
 
 newtype W = W {w :: BitVector 16} deriving (Num, Ord, Eq)

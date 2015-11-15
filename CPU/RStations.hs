@@ -1,4 +1,4 @@
-module CPU.RStations (RStations, freeSlot, insert, empty, RSEntry(..)) where
+module CPU.RStations (RStations(..), freeSlot, insert, empty, RSEntry(..)) where
 
 import CLaSH.Prelude hiding (empty)
 import CPU.Defs (StationID(..), RobID(..))
