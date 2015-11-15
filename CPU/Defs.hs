@@ -36,10 +36,10 @@ instance KnownNat n => Enum (RobID n) where
     pred (RobID 0) = RobID maxBound
     pred (RobID n) = RobID (n-1)
 
-data Read = NoRead | Read Addr
-data Fetch = NoFetch | Fetch Addr
+data Read = NoRead | Read Addr deriving Show
+data Fetch = NoFetch | Fetch Addr deriving Show
 
-data MemRead = NothingRead | ReadSome W
+data MemRead = NothingRead | ReadSome W deriving Show
 
 instance Show Addr where show (Addr a) = printf "[Addr %x]" (fromEnum a)
 instance Show PC where show (PC a)     = printf "[PC %x]"   (fromEnum a)
