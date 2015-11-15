@@ -1,17 +1,20 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module CPU.RegisterFile (RegisterFile, renameReg, copyFrom) where
+module CPU.RegisterFile (RegisterFile, renameReg, copyFrom, empty) where
 
-import CLaSH.Prelude
-import CPU.Defs (RIx(..), RVal(Literal,Pending), StationID)
+import CLaSH.Prelude hiding (empty)
+import CPU.Defs (RIx(..), RVal(Literal,Pending), RobID)
 import CPU.Op (Op(..))
 
-data RegisterFile fus stations = RegFile (Vec 16 (RVal (StationID fus stations)))
+data RegisterFile rob = RegFile (Vec 16 (RVal (RobID rob))) deriving (Show, Eq)
 
-renameReg :: RIx -> StationID f s -> RegisterFile f s -> RegisterFile f s
+empty :: RegisterFile r
+empty = RegFile $ repeat $ Literal 0
+
+renameReg :: RIx -> RobID r -> RegisterFile r -> RegisterFile r
 renameReg (RIx rix) newName (RegFile vec) = RegFile $ replace rix (Pending newName) vec
 
-copyFrom :: forall f s . RegisterFile f s -> Op RIx -> Op (StationID f s)
+copyFrom :: forall r . RegisterFile r -> Op RIx -> Op (RobID r)
 copyFrom (RegFile regs) op = case op of
         Halt      -> Halt
         Jmp pc    -> Jmp pc
@@ -21,6 +24,6 @@ copyFrom (RegFile regs) op = case op of
         Ldr a b r -> Ldr (update a) (update b) r
         Jeq a b p -> Jeq (update a) (update b) p 
     where
-    update :: RVal RIx -> RVal (StationID f s)
+    update :: RVal RIx -> RVal (RobID r)
     update (Literal w)   = Literal w
     update (Pending rix) = regs !! rix

@@ -6,7 +6,7 @@ import Text.Printf (printf)
 import qualified Prelude as P
 
 
-data Count n = Empty | Count (Index n) deriving (Eq)
+data Count n = Empty | Count (Index n) deriving (Eq, Ord)
 
 instance KnownNat n => Enum (Count n) where
     succ Empty = Count 0
@@ -30,6 +30,16 @@ count (Buffer c _) = c
 -- Ring buffer
 data Buffer n a = Buffer (Count n) (Vec n a)
 
+instance (KnownNat n, Eq a) => Eq (Buffer n a) where
+    (Buffer ca a) == (Buffer cb b)
+        | ca /= cb  = False
+        | otherwise = allTrue matches
+        where
+        eqs = zipWith (==) a b
+        mask = map (\ix -> Count ix > ca) indicesI
+        matches = zipWith (||) mask eqs
+        allTrue = foldl (&&) True
+
 instance (Show a, KnownNat n) => Show (Buffer n a) where
     show (Buffer count vec) = printf "[Buffer <%s>]" (format count (toList vec))
         where
@@ -43,7 +53,7 @@ intStats :: (KnownNat n) => Buffer n a -> (Int, Int)
 intStats buf = (fromEnum (maxCount buf), fromEnum (count buf))
 
 empty :: (KnownNat n) => Buffer n a
-empty = Buffer Empty (repeat undefined)
+empty = Buffer Empty (repeat $ error "Default buffer value")
 
 -- Force insertion, no overflow check
 insert' :: (KnownNat n) => Buffer n a -> a -> Buffer n a

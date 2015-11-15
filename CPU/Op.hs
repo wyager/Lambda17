@@ -4,18 +4,18 @@ import CLaSH.Prelude
 import CPU.Defs (PC(..), Predicted(..), RIx(..), RVal(..), W(..), Addr(..), StationID(..))
 import qualified CPU.InstructionSet as I
 
-data Fetched op = Fetched PC (Predicted PC) op
+data Fetched op = Fetched PC (Predicted PC) op deriving (Show, Eq)
 
 -- rix is either RIx (for instrs still in the buffer)
--- or StationID (for instrs that have been dispatched)
+-- or RobID (for instrs that have been dispatched)
 data Op rix = Mov W RIx
             | Add (RVal rix) (RVal rix) RIx
             | Jmp PC
             | Halt
-            | Ld (RVal rix) RIx
+            | Ld  (RVal rix) RIx
             | Ldr (RVal rix) (RVal rix) RIx
             | Jeq (RVal rix) (RVal rix) PC
-            deriving (Eq)
+            deriving (Eq, Show)
 
 grounded :: Op (StationID f s) -> Bool
 grounded op = case op of

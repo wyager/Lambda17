@@ -1,11 +1,11 @@
-module CPU.OpBuffer (OpBuffer, insert, take) where
+module CPU.OpBuffer (OpBuffer, insert, take, empty) where
 
-import CLaSH.Prelude hiding (take)
+import CLaSH.Prelude hiding (take, empty)
 import qualified CPU.Buffer as Buf
 import CPU.Op (Op, Fetched(..))
 import CPU.Defs (PC, Predicted(..), RIx)
 
-data OpBuffer n = IB {fetch_pc :: PC, buf :: Buf.Buffer n (Fetched (Op RIx))}
+data OpBuffer n = IB {fetch_pc :: PC, buf :: Buf.Buffer n (Fetched (Op RIx))} deriving (Show, Eq)
 
 empty :: KnownNat n => OpBuffer n
 empty = IB 0 Buf.empty

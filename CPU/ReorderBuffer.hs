@@ -1,19 +1,31 @@
-module CPU.ReorderBuffer (ROB, oneFree, twoFree, waitFor) where
+module CPU.ReorderBuffer (ROB, oneFree, twoFree, robInsert, empty) where
 
-import CLaSH.Prelude
-import CPU.Defs (StationID)
+import CLaSH.Prelude hiding (empty)
+import CPU.Defs (StationID, RobID(..))
 import CPU.Op (Op, Fetched)
 import CPU.Buffer (Buffer, intStats, full, insert')
+import qualified CPU.Buffer as Buf
 
-data ROB n f s = ROB (Buffer n (Waiting f s))
+data ROB r = ROB {buf   :: (Buffer r (Waiting r)),
+                  first :: (RobID r),
+                  next  :: (RobID r)} deriving (Show, Eq)
 
-data Waiting f s = Waiting (Fetched (Op (StationID f s))) (StationID f s) Bool
+data Waiting r = Waiting (Fetched (Op (RobID r))) 
+               | Done    (Fetched (Op (RobID r))) 
+               deriving (Show, Eq)
 
-oneFree :: KnownNat n => ROB n f s -> Bool
-oneFree (ROB buf) = not (full buf)
+empty :: KnownNat r => ROB r
+empty = ROB Buf.empty (RobID 0) (RobID 0)
 
-twoFree :: KnownNat n => ROB n f s -> Bool
-twoFree (ROB buf) = let (max, count) = intStats buf in max - count >= 2
+oneFree :: KnownNat r => ROB r -> Bool
+oneFree (ROB buf _ _) = not (full buf)
 
-waitFor :: KnownNat n => Fetched (Op (StationID f s)) -> StationID f s -> ROB n f s -> ROB n f s
-waitFor op from (ROB buf) = ROB $ insert' buf $ Waiting op from False
+twoFree :: KnownNat r => ROB r -> Bool
+twoFree (ROB buf _ _) = let (max, count) = intStats buf in max - count >= 2
+
+robInsert :: KnownNat r => Fetched (Op (RobID r)) -> ROB r -> (RobID r, ROB r)
+robInsert op (ROB buf first next) = (next, ROB (insert' buf $ Waiting op) first (succ next))
+
+
+--waitFor :: KnownNat n => Fetched (Op (StationID f s)) -> StationID f s -> ROB n f s -> ROB n f s
+--waitFor op from (ROB buf) = ROB $ insert' buf $ Waiting op from

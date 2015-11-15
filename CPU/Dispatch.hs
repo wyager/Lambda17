@@ -1,51 +1,67 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module CPU.Dispatch () where
+module CPU.Dispatch (CPU.Dispatch.empty, dispatch, dispatchN, DispatchState(..)) where
 
-import CLaSH.Prelude hiding (take)
+import Text.Printf
+import CLaSH.Prelude hiding (take, empty)
 import Data.Maybe (fromJust)
-import CPU.Defs (RVal(Pending, Literal), RIx, Predicted(..), StationID(..))
+import CPU.Defs (RVal(Pending, Literal), RIx, Predicted(..), StationID(..), RobID(..))
 import CPU.Op (Fetched(..), Op(..))
-import CPU.RegisterFile (RegisterFile, renameReg, copyFrom)
-import CPU.OpBuffer (OpBuffer, take)
-import CPU.RStations (RStations, freeSlot, insert)
-import CPU.ReorderBuffer (ROB, oneFree, twoFree, waitFor)
+import CPU.RegisterFile as RF (RegisterFile, renameReg, copyFrom, empty)
+import CPU.OpBuffer as OB (OpBuffer, take, empty)
+import CPU.RStations as RS (RStations, RSEntry(..), freeSlot, insert, empty)
+import CPU.ReorderBuffer as ROB (ROB, oneFree, twoFree, robInsert, empty)
 
-data DistpatchState n f s d = DS (OpBuffer (n+1)) (RegisterFile f s) (RStations f s) (ROB d f s)
+data DispatchState n f s r = DS {opBuffer :: (OpBuffer n),
+                                 regFile  :: (RegisterFile r),
+                                 stations :: (RStations f s r),
+                                 rob      :: (ROB r) } deriving (Eq)
+
+instance KN n f s r => Show (DispatchState n f s r) where
+    show (DS ob rf rs rob) = printf "Dispatch:\n  %s\n  %s\n  %s\n  %s" (show ob) (show rf) (show rs) (show rob)
+
+type KN n f s r = (KnownNat n, KnownNat f, KnownNat s, KnownNat r)
+
+empty :: KN n f s r => DispatchState n f s r
+empty = DS OB.empty RF.empty RS.empty ROB.empty
+
 
 -- We return left if it failed, right if it succeeded. This way,
 -- we can write a do-expression to update dispatch with multiple instructions
 -- and we don't try to pull too many.
-dispatch :: (KnownNat (n+1), KnownNat f, KnownNat s, KnownNat d)
-         => (Op (StationID f s) -> Index f) 
-         -> DistpatchState n f s d
-         -> Either (DistpatchState n f s d) (DistpatchState n f s d)
+dispatch :: KN (n+1) f s r
+         => (Op (RobID r) -> Index f) 
+         -> DispatchState (n+1) f s r
+         -> Either (DispatchState (n+1) f s r) (DispatchState (n+1) f s r)
 dispatch select state@(DS insts regs stations rob) = case take insts of
     (_, Nothing)      -> Left state
     (insts', Just fetched@(Fetched pc pred (Ldr a b r))) -> 
         if thereIsAddSpace && thereIsLdSpace && thereIsRobSpace
-            then Right $ DS insts' regs' stations' rob'
+            then Right $ DS insts' regs' stations' rob''
             else Left state
         where
         thereIsRobSpace = twoFree rob
         -- Assumption: Add stations and Ld stations are disjoint
-        fakeAdd = copyFrom regs $ Add a b (error "Error: Virtual add register should not be used!")
+        fakeAdd = copyFrom regs $ Add a b 0-- (error "Error: Virtual add register should not be used!")
         addFu = select fakeAdd
         addSlot = freeSlot stations addFu 
         thereIsAddSpace | (Just _) <- addSlot = True
                         | Nothing  <- addSlot = False
         addStation = StationID addFu (fromJust addSlot)
         -- Time to make the fake load now
-        fakeLd = Ld (Pending addStation) r
+        fakeLd = Ld (Pending addID) r
         ldFu = select fakeLd
         ldSlot = freeSlot stations ldFu
         thereIsLdSpace | (Just _) <- ldSlot = True
                        | Nothing  <- ldSlot = False
         ldStation = StationID ldFu (fromJust ldSlot)
-        regs' = renameReg r ldStation regs
-        stations' = insert addStation fakeAdd $ insert ldStation fakeLd $ stations
-        rob' = waitFor (Fetched pc (Predicted pc  ) fakeLd)  ldStation  $ 
-               waitFor (Fetched pc pred             fakeAdd) addStation $ rob
+        (addID, rob')  = robInsert (Fetched pc pred fakeAdd) rob
+        (ldID,  rob'') = robInsert (Fetched pc pred fakeLd)  rob'
+        regs' = renameReg r ldID regs
+        stations' = insert addStation (RSEntry fakeAdd addID) 
+                  $ insert ldStation  (RSEntry fakeLd ldID) 
+                  $ stations
+
     (insts', Just fetched@(Fetched pc pred op)) ->
         if thereIsSpace && thereIsRobSpace
             then Right $ DS insts' regs' stations' rob'
@@ -58,20 +74,23 @@ dispatch select state@(DS insts regs stations rob) = case take insts of
         thereIsSpace | (Just _) <- slot = True
                      | Nothing  <- slot = False
         opStation = StationID fu (fromJust slot)
-        stations' = insert opStation op' stations
+        (opID, rob') = robInsert (Fetched pc pred op') rob
+        stations' = insert opStation (RSEntry op' opID) stations
         regs' = case op' of
             Mov _   r -> overwrite r 
             Add _ _ r -> overwrite r
             Ld  _   r -> overwrite r
             Jeq _ _ _ -> regs
             Jmp _     -> regs
-        overwrite r = renameReg r opStation regs
-        rob' = waitFor (Fetched pc pred op') opStation rob
+        overwrite r = renameReg r opID regs
 
-
-
-
-
-
-
-
+-- Dispatch up to n times, as many as we can fit
+dispatchN :: forall m n f s r . KN (m+1) f s r
+         => SNat n
+         -> (Op (RobID r) -> Index f) 
+         -> DispatchState (m+1) f s r
+         -> DispatchState (m+1) f s r
+dispatchN n select state = either id id $ goN (return state)
+    where
+    dispatch' () state = state >>= dispatch select
+    goN state = foldr dispatch' state (replicate n ())
