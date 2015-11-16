@@ -3,7 +3,8 @@
 module CPU.Defs (
     W(..), RIx(..), PC(..), Addr(..), 
     Predicted(..), RVal(..), StationID(..), 
-    RobID(..), Read(..), MemRead(..), Jump(..)) where
+    RobID(..), Read(..), MemRead(..), Jump(..),
+    Halt(..)) where
 
 import CLaSH.Prelude hiding (Read)
 import Text.Printf (printf)
@@ -19,6 +20,8 @@ newtype Addr = Addr {addrOf :: BitVector 16} deriving (Ord, Eq)
 newtype Predicted a = Predicted a deriving (Eq)
 
 data Jump = NoJump | Jump PC deriving (Show, Eq)
+
+data Halt = DontHalt | DoHalt deriving (Show, Eq)
 
 -- The register representation inside instructions.
 -- rix is RIx (pre-dispatch) or StationID (post-dispatch)

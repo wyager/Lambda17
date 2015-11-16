@@ -1,4 +1,4 @@
-module CPU.OpBuffer (OpBuffer, insert, take, empty) where
+module CPU.OpBuffer (OpBuffer(fetch_pc), insert, take, empty) where
 
 import CLaSH.Prelude hiding (take, empty)
 import qualified CPU.Buffer as Buf

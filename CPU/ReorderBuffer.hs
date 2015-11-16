@@ -1,9 +1,9 @@
-module CPU.ReorderBuffer (ROB(..), Waiting(..), oneFree, twoFree, robInsert, empty) where
+module CPU.ReorderBuffer (ROB(..), Waiting(..), oneFree, twoFree, robInsert, empty, robPop) where
 
-import CLaSH.Prelude hiding (empty)
+import CLaSH.Prelude hiding (empty, take)
 import CPU.Defs (StationID, RobID(..))
 import CPU.Op (Op, Fetched)
-import CPU.Buffer (Buffer, intStats, full, insert')
+import CPU.Buffer (Buffer, intStats, full, insert', take)
 import qualified CPU.Buffer as Buf
 
 data ROB r = ROB {buf   :: (Buffer r (Waiting r)),
@@ -28,7 +28,7 @@ robInsert op (ROB buf first next) = (next, ROB (insert' buf $ Waiting op) first 
 
 robPop :: KnownNat (r+1) => ROB (r+1) -> (Maybe (Fetched (Op (RobID (r+1)))), ROB (r+1))
 robPop rob@(ROB buf first next) = case take buf of
-    (buf,  Nothing)    -> (Nothing, rob)
+    (buf',  Nothing)   -> (Nothing, rob)
     (buf', Just entry) -> case entry of
         Waiting _ -> (Nothing, rob)
         Done op   -> (Just op, ROB buf' (succ first) next)
