@@ -1,4 +1,4 @@
-module CPU.ReorderBuffer (ROB, oneFree, twoFree, robInsert, empty) where
+module CPU.ReorderBuffer (ROB(..), Waiting(..), oneFree, twoFree, robInsert, empty) where
 
 import CLaSH.Prelude hiding (empty)
 import CPU.Defs (StationID, RobID(..))

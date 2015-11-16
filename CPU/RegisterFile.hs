@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module CPU.RegisterFile (RegisterFile, renameReg, copyFrom, empty) where
+module CPU.RegisterFile (RegisterFile(..), renameReg, copyFrom, empty) where
 
 import CLaSH.Prelude hiding (empty)
 import CPU.Defs (RIx(..), RVal(Literal,Pending), RobID)

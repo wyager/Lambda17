@@ -27,7 +27,7 @@ data RVal rix = Pending rix | Literal W deriving (Eq, Show)
 -- Used instead of RIx post-dispatch
 data StationID fus stations = StationID (Index fus) (Index stations) deriving (Eq, Show)
 
-newtype RobID n = RobID (Index n) deriving (Show, Eq)
+newtype RobID n = RobID (Index n) deriving (Show, Eq, Ord)
 instance KnownNat n => Enum (RobID n) where
     toEnum = RobID . toEnum 
     fromEnum (RobID n) = fromEnum n

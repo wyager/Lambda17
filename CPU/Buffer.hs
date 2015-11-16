@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-module CPU.Buffer (Buffer, empty, insert, insert', full, take, intStats) where
+module CPU.Buffer (Buffer(..), Count(..), empty, insert, insert', full, take, intStats) where
 
 import CLaSH.Prelude hiding (drop, empty, take) 
 import Text.Printf (printf)

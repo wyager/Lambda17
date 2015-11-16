@@ -5,7 +5,7 @@ import CPU.Dispatch (DispatchState(DS), dispatchN, empty)
 import CPU.OpBuffer (empty, insert, OpBuffer)
 import CPU.Op (Op(..), Fetched(..))
 import CPU.RegisterFile (RegisterFile, empty)
-import CPU.Defs (Predicted(..), RVal(..), MemRead, Read)
+import CPU.Defs (Predicted(..), RVal(..), MemRead(NothingRead, ReadSome), Read, RIx)
 import CPU.ReorderBuffer (ROB, empty)
 import CPU.RStations (RStations, empty)
 import CPU.FunctionalUnits (FUStates, FUsC, select, empty, step)
@@ -36,6 +36,16 @@ data CPUState (l  :: Nat)
     rob      :: ROB rb,
     fustates :: FUStates l l' f f' c c' rb
 } deriving Show
+
+insertOp :: KnownNat ob => CPUState l l' f f' c c' rh ob rb ds -> Fetched (Op RIx) -> CPUState l l' f f' c c' rh ob rb ds
+insertOp state op = state {opBuffer = CPU.OpBuffer.insert (opBuffer state) op}
+
+s1 = insertOp Playground.empty $ Fetched 0 (Predicted 1) (Mov 3 4)
+
+s2 = insertOp s1 $ Fetched 1 (Predicted 2) (Mov 7 8)
+
+res = cpu s2 (repeat NothingRead)
+
 
 empty :: CPUState 3 4 3 4 2 6 12 16 64 2
 empty = CPUState CPU.OpBuffer.empty CPU.RegisterFile.empty CPU.RStations.empty CPU.ReorderBuffer.empty CPU.FunctionalUnits.empty
