@@ -9,7 +9,10 @@ import CPU.Defs (Predicted(..), RVal(..), MemRead(NothingRead, ReadSome), Read, 
 import CPU.ReorderBuffer (ROB, empty)
 import CPU.RStations (RStations, empty)
 import CPU.FunctionalUnits (FUStates, FUsC, select, empty, step)
+import CPU.CDBBroadcast (CDBBS(..), process)
 import CLaSH.Prelude hiding (select, Read)
+import Data.List (intercalate)
+import Text.Printf (printf)
 
 --s0 = CPU.Dispatch.empty :: DispatchState 5 3 2 10
 
@@ -35,7 +38,15 @@ data CPUState (l  :: Nat)
     stations :: RStations 3 rh rb,
     rob      :: ROB rb,
     fustates :: FUStates l l' f f' c c' rb
-} deriving Show
+}
+
+instance (KnownNat ob, KnownNat rb) => Show (CPUState l l' f f' c c' rh ob rb ds) where
+    show (CPUState opBuffer regFile stations rob fustates) = intercalate "\n\n" [
+        printf "Op Buffer: %s" (show opBuffer),
+        printf "Register File: %s" (show regFile),
+        printf "Registration stations: %s" (show stations),
+        printf "Reorder buffer: %s" (show rob),
+        printf "Functional unit states: %s" (show fustates) ]
 
 insertOp :: KnownNat ob => CPUState l l' f f' c c' rh ob rb ds -> Fetched (Op RIx) -> CPUState l l' f f' c c' rh ob rb ds
 insertOp state op = state {opBuffer = CPU.OpBuffer.insert (opBuffer state) op}
@@ -47,7 +58,13 @@ s2 = insertOp s1 $ Fetched 1 (Predicted 2) (Mov 7 8)
 res = cpu s2 (repeat NothingRead)
 
 
-empty :: CPUState 3 4 3 4 2 6 12 16 64 2
+prog = zipWith3 (\pc pred op -> Fetched pc (Predicted pred) op) (iterateI (+1) 0) (iterateI (+1) 1)
+
+s3 = foldl insertOp Playground.empty $ prog (Mov 3 1 :> Mov 5 1 :> Add (Pending 1) (Pending 1) 2 :> Nil)
+
+
+
+empty :: CPUState 3 4 3 4 2 6 12 16 64 6
 empty = CPUState CPU.OpBuffer.empty CPU.RegisterFile.empty CPU.RStations.empty CPU.ReorderBuffer.empty CPU.FunctionalUnits.empty
 
 cpu :: forall ldus lduslots -- must mult to resheight
@@ -67,12 +84,16 @@ cpu :: forall ldus lduslots -- must mult to resheight
               => CPUState ldus lduslots fpus fpuslots cus cuslots resheight opbuffer reorderbuffer dispatches
               -> Vec ldus MemRead
               -> (CPUState ldus lduslots fpus fpuslots cus cuslots resheight opbuffer reorderbuffer dispatches, Vec ldus Read)
-cpu (CPUState opBuffer regFile stations rob fustates) reads = (CPUState opBuffer' regFile' stations'' rob' fustates', reqs)
+cpu (CPUState opBuffer regFile stations rob fustates) reads = (CPUState opBuffer' regFile'' stations''' rob'' fustates', reqs)
     where
     dispatch0 = DS opBuffer regFile stations rob
     dispatchn = dispatchN (snat :: SNat dispatches) select dispatch0
     (DS opBuffer' regFile' stations' rob') = dispatchn
     (fustates', stations'', cdbmessages, reqs) = step fustates stations' reads
+    broadcast0 = CDBBS regFile' stations'' rob'
+    broadcast' = process cdbmessages broadcast0
+    (CDBBS regFile'' stations''' rob'') = broadcast'
+
 
 topEntity :: CPUState 3 4 3 4 2 6 12 16 64 2 -> Vec 3 MemRead -> (CPUState 3 4 3 4 2 6 12 16 64 2, Vec 3 Read)
 topEntity = cpu
