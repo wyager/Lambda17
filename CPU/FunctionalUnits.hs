@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module CPU.FunctionalUnits (FUStates, FUsC, select, step, topEntity, empty) where
+module CPU.FunctionalUnits (FUStates, FUsC, select, step, empty) where
 
 import CLaSH.Prelude hiding (select, split, Read, empty)
 import CPU.Defs (RobID, RVal(..), Read(..), MemRead(..), RIx, W(w), Addr(Addr))
@@ -131,8 +131,8 @@ take1 vec = case findIndex ready vec of
     ready (Just (RSEntry instr _)) = grounded instr
 
 -- Not so bad!
-topEntity :: FUStates 3 4 3 4 2 6 64
-          -> RStations 3 12 64
-          -> Vec 3 MemRead
-          -> (FUStates 3 4 3 4 2 6 64, RStations 3 12 64, Vec (3 + 3 + 2) (Maybe (CDBMessage 64)), Vec 3 Read)
-topEntity = step
+--topEntity :: FUStates 3 4 3 4 2 6 64
+--          -> RStations 3 12 64
+--          -> Vec 3 MemRead
+--          -> (FUStates 3 4 3 4 2 6 64, RStations 3 12 64, Vec (3 + 3 + 2) (Maybe (CDBMessage 64)), Vec 3 Read)
+--topEntity = step

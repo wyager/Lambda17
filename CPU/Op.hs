@@ -1,4 +1,4 @@
-module CPU.Op (Fetched(..), Op(..), grounded) where
+module CPU.Op (Fetched(..), Op(..), grounded, convert) where
 
 import CLaSH.Prelude 
 import CPU.Defs (PC(..), Predicted(..), RIx(..), RVal(..), W(..), Addr(..), StationID(..))

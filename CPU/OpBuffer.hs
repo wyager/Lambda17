@@ -1,4 +1,4 @@
-module CPU.OpBuffer (OpBuffer(fetch_pc), insert, take, empty) where
+module CPU.OpBuffer (OpBuffer(fetch_pc), insert, take, empty, insertMany) where
 
 import CLaSH.Prelude hiding (take, empty)
 import qualified CPU.Buffer as Buf
@@ -15,6 +15,9 @@ insert ib@(IB _ buf)        _ | Buf.full buf   = ib -- Can't insert anything!
 insert ib@(IB fetch_pc buf) fetched@(Fetched pc (Predicted pc') _)
                               | pc == fetch_pc = IB pc' (Buf.insert' buf fetched)
                               | otherwise      = ib -- Incorrect fetch!
+
+insertMany :: (KnownNat n, KnownNat i) => Vec i (Fetched (Op RIx)) -> OpBuffer n -> OpBuffer n
+insertMany ops buf = foldl insert buf ops
 
 -- Don't touch fetch_pc. Only an insert should do that.
 take :: KnownNat (n+1) => OpBuffer (n+1) -> (OpBuffer (n+1), Maybe (Fetched (Op RIx)))

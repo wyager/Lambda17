@@ -1,4 +1,4 @@
-module CPU.InstructionSet (Instruction(..), FetchedInstruction(..)) where
+module CPU.InstructionSet (Instruction(..), FetchedInstruction(..), parse) where
 
 import CPU.Defs(W(..), RIx(..), PC(..), Addr(..))
 import CLaSH.Prelude 

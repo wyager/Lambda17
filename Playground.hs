@@ -1,17 +1,18 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-module Playground () where
+module Playground (CPUState, Playground.empty, cpu) where
 
 import CPU.Dispatch (DispatchState(DS), dispatchN, empty)
 import CPU.OpBuffer (empty, insert, OpBuffer(fetch_pc))
 import CPU.Op (Op(..), Fetched(..))
 import CPU.RegisterFile (RegisterFile, empty)
-import CPU.Defs (Predicted(..), RVal(..), MemRead(NothingRead, ReadSome), Read, RIx, Halt(..), PC)
+import CPU.Defs (Predicted(..), RVal(..), MemRead(NothingRead, ReadSome), Read, RIx, Halt(..), PC, Fetch)
 import CPU.ReorderBuffer (ROB, empty)
 import CPU.RStations (RStations, empty)
 import CPU.FunctionalUnits (FUStates, FUsC, select, empty, step)
 import CPU.BackupRegs (BackupRegs, restore, empty)
 import CPU.Commit (CommitState(CS), Action(Jump,Stop,OK), commitN)
 import CPU.CDBBroadcast (CDBBS(..), process)
+import CPU.Fetch (FetchState, empty, fetch)
 import CLaSH.Prelude hiding (select, Read)
 import Data.List (intercalate)
 import Text.Printf (printf)
@@ -40,17 +41,19 @@ data CPUState (l  :: Nat)
     stations :: RStations 3 rh rb,
     rob      :: ROB rb,
     fustates :: FUStates l l' f f' c c' rb,
-    backups  :: BackupRegs
+    backups  :: BackupRegs,
+    fetching :: FetchState
 }
 
 instance (KnownNat ob, KnownNat rb) => Show (CPUState l l' f f' c c' rh ob rb ds) where
-    show (CPUState opBuffer regFile stations rob fustates backups) = intercalate "\n\n" [
+    show (CPUState opBuffer regFile stations rob fustates backups fetching) = intercalate "\n\n" [
         printf "Op Buffer: %s" (show opBuffer),
         printf "Register File: %s" (show regFile),
         printf "Registration stations: %s" (show stations),
         printf "Reorder buffer: %s" (show rob),
         printf "Functional unit states: %s" (show fustates),
-        printf "Register backups: %s" (show backups) ]
+        printf "Register backups: %s" (show backups),
+        printf "Fetch state: %s" (show fetching) ]
 
 insertOp :: KnownNat ob => CPUState l l' f f' c c' rh ob rb ds -> Fetched (Op RIx) -> CPUState l l' f f' c c' rh ob rb ds
 insertOp state op = state {opBuffer = CPU.OpBuffer.insert (opBuffer state) op}
@@ -71,7 +74,13 @@ empty' :: CPUState 3 4 3 4 2 6 12 16 64 6
 empty' = Playground.empty
 
 empty :: (FUsC l l' f f' c c' rh, KnownNat ob, KnownNat rb) => CPUState l l' f f' c c' rh ob rb ds
-empty = CPUState CPU.OpBuffer.empty CPU.RegisterFile.empty CPU.RStations.empty CPU.ReorderBuffer.empty CPU.FunctionalUnits.empty CPU.BackupRegs.empty
+empty = CPUState CPU.OpBuffer.empty 
+                 CPU.RegisterFile.empty 
+                 CPU.RStations.empty 
+                 CPU.ReorderBuffer.empty 
+                 CPU.FunctionalUnits.empty 
+                 CPU.BackupRegs.empty 
+                 CPU.Fetch.empty
 
 cpu :: forall ldus lduslots -- must mult to resheight
               fpus fpuslots -- must mult to resheight
@@ -92,12 +101,14 @@ cpu :: forall ldus lduslots -- must mult to resheight
                KnownNat dispatches)
               => CPUState ldus lduslots fpus fpuslots cus cuslots resheight opbuffer reorderbuffer dispatches
               -> Vec ldus MemRead
-              -> (CPUState ldus lduslots fpus fpuslots cus cuslots resheight opbuffer reorderbuffer dispatches, Vec ldus Read, Halt)
-cpu (CPUState opBuffer regFile stations rob fustates backups) reads = (state', reqs, halt)
+              -> Vec dispatches MemRead
+              -> (CPUState ldus lduslots fpus fpuslots cus cuslots resheight opbuffer reorderbuffer dispatches, Vec ldus Read, Vec dispatches Fetch, Halt)
+cpu (CPUState opBuffer regFile stations rob fustates backups fetching) reads fetches = (state', reqs, fetchRequests, halt)
     where
-    dispatch0 = DS opBuffer regFile stations rob
+    (fetching', opBuffer', fetchRequests) = fetch fetching opBuffer fetches
+    dispatch0 = DS opBuffer' regFile stations rob
     dispatchn = dispatchN (snat :: SNat dispatches) select dispatch0
-    (DS opBuffer' regFile' stations' rob') = dispatchn
+    (DS opBuffer'' regFile' stations' rob') = dispatchn
     (fustates', stations'', cdbmessages, reqs) = step fustates stations' reads
     broadcast0 = CDBBS regFile' stations'' rob'
     broadcast' = process cdbmessages broadcast0
@@ -109,7 +120,7 @@ cpu (CPUState opBuffer regFile stations rob fustates backups) reads = (state', r
         Stop -> DoHalt
         _    -> DontHalt
     state' = case action of
-        OK      -> CPUState opBuffer' regFile'' stations''' rob''' fustates' backups'
+        OK      -> CPUState opBuffer'' regFile'' stations''' rob''' fustates' backups' fetching'
         Jump pc -> reset pc backups'
         Stop    -> error "Trying to run after a halt!"
 
@@ -121,5 +132,5 @@ reset pc backup = empty {opBuffer = with pc, regFile = restore backup}
     empty = Playground.empty :: CPUState l l' f f' c c' rh ob rb ds
 
 
-topEntity :: CPUState 3 4 3 4 2 6 12 16 64 2 -> Vec 3 MemRead -> (CPUState 3 4 3 4 2 6 12 16 64 2, Vec 3 Read, Halt)
-topEntity = cpu
+--topEntity :: CPUState 3 4 3 4 2 6 12 16 64 6 -> Vec 3 MemRead -> Vec 6 MemRead -> (CPUState 3 4 3 4 2 6 12 16 64 6, Vec 3 Read, Vec 6 Fetch, Halt)
+--topEntity = cpu

@@ -4,7 +4,7 @@ module CPU.Defs (
     W(..), RIx(..), PC(..), Addr(..), 
     Predicted(..), RVal(..), StationID(..), 
     RobID(..), Read(..), MemRead(..), Jump(..),
-    Halt(..)) where
+    Halt(..), Fetch(..)) where
 
 import CLaSH.Prelude hiding (Read)
 import Text.Printf (printf)
@@ -42,9 +42,9 @@ instance KnownNat n => Enum (RobID n) where
     pred (RobID n) = RobID (n-1)
 
 data Read = NoRead | Read Addr deriving Show
-data Fetch = NoFetch | Fetch Addr deriving Show
+data Fetch = NoFetch | Fetch PC deriving Show
 
-data MemRead = NothingRead | ReadSome W deriving Show
+data MemRead = NothingRead | ReadSome W deriving (Show, Eq)
 
 instance Show Addr where show (Addr a) = printf "[Addr %x]" (fromEnum a)
 instance Show PC where show (PC a)     = printf "[PC %x]"   (fromEnum a)
