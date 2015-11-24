@@ -11,11 +11,11 @@ import Text.Printf (printf)
 
 newtype W = W {w :: BitVector 16} deriving (Num, Ord, Eq)
 
-newtype PC = PC {pc :: BitVector 16} deriving (Num, Ord, Eq)
+newtype PC = PC {pc :: BitVector 16} deriving (Num, Ord, Eq, Enum)
 
 newtype RIx = RIx {rIx :: Index 16} deriving (Num, Enum, Ord, Eq)
 
-newtype Addr = Addr {addrOf :: BitVector 16} deriving (Ord, Eq)
+newtype Addr = Addr {addrOf :: BitVector 16} deriving (Ord, Eq, Enum)
 
 newtype Predicted a = Predicted a deriving (Eq)
 

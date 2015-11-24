@@ -82,6 +82,8 @@ dispatch select state@(DS insts regs stations rob) = case take insts of
             Ld  _   r -> overwrite r
             Jeq _ _ _ -> regs
             Jmp _     -> regs
+            Halt      -> regs
+            _         -> error "Unknown op in dispatch" -- (printf "Unknown op in dispatch: %s" (show op'))
         overwrite r = renameReg r opID regs
 
 -- Dispatch up to n times, as many as we can fit

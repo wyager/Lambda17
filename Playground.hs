@@ -70,6 +70,7 @@ s3 = foldl insertOp Playground.empty' $ prog (Mov 3 1 :> Mov 5 1 :> Add (Pending
 
 
 
+
 empty' :: CPUState 3 4 3 4 2 6 12 16 64 6
 empty' = Playground.empty
 
@@ -102,8 +103,8 @@ cpu :: forall ldus lduslots -- must mult to resheight
               => CPUState ldus lduslots fpus fpuslots cus cuslots resheight opbuffer reorderbuffer dispatches
               -> Vec ldus MemRead
               -> Vec dispatches MemRead
-              -> (CPUState ldus lduslots fpus fpuslots cus cuslots resheight opbuffer reorderbuffer dispatches, Vec ldus Read, Vec dispatches Fetch, Halt)
-cpu (CPUState opBuffer regFile stations rob fustates backups fetching) reads fetches = (state', reqs, fetchRequests, halt)
+              -> (CPUState ldus lduslots fpus fpuslots cus cuslots resheight opbuffer reorderbuffer dispatches, Vec ldus Read, Vec dispatches Fetch, Halt, BackupRegs)
+cpu (CPUState opBuffer regFile stations rob fustates backups fetching) reads fetches = (state', reqs, fetchRequests, halt, backups')
     where
     (fetching', opBuffer', fetchRequests) = fetch fetching opBuffer fetches
     dispatch0 = DS opBuffer' regFile stations rob
@@ -123,10 +124,11 @@ cpu (CPUState opBuffer regFile stations rob fustates backups fetching) reads fet
         OK      -> CPUState opBuffer'' regFile'' stations''' rob''' fustates' backups' fetching'
         Jump pc -> reset pc backups'
         Stop    -> error "Trying to run after a halt!"
+    debug = state'
 
 reset :: forall l l' f f' c c' rh ob rb ds . (FUsC l l' f f' c c' rh, KnownNat ob, KnownNat rb) 
       => PC -> BackupRegs -> CPUState l l' f f' c c' rh ob rb ds
-reset pc backup = empty {opBuffer = with pc, regFile = restore backup}
+reset pc backup = empty {opBuffer = with pc, regFile = restore backup, backups = backup}
     where
     with pc = CPU.OpBuffer.empty {fetch_pc = pc} :: OpBuffer ob
     empty = Playground.empty :: CPUState l l' f f' c c' rh ob rb ds

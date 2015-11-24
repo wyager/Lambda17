@@ -1,32 +1,45 @@
-module Hardware (topEntity) where
+module Hardware (topEntity, cpu') where
 
 import CLaSH.Prelude hiding (empty, Read)
 import CPU.Defs (Read(..), MemRead(..), Fetch(..), Halt(..), Addr(..), PC(..), W(..))
 import Playground (CPUState, empty, cpu)
+import CPU.BackupRegs (BackupRegs(..))
 
-initial :: CPUState 3 4 3 4 2 6 12 16 64 6
+-- CPU parameters
+type LDUs = 3
+type LDUSlots = 2
+type FPUs = 2
+type FPUSlots = 3
+type CUs = 1
+type CUSlots = 6
+type Height = 6
+type IBuf = 16
+type RBuf = 16
+type DispatchPerCycle = 2
+
+initial :: CPUState LDUs LDUSlots FPUs FPUSlots CUs CUSlots Height IBuf RBuf DispatchPerCycle
 initial = Playground.empty
 
-cpu' :: Signal (Vec 3 MemRead) -> Signal (Vec 6 MemRead) -> Signal (Vec 3 Read, Vec 6 Fetch, Halt)
-cpu' loads fetches = bundle (loadReqs, fetchReqs, halt)
+cpu' :: Signal (Vec LDUs MemRead) -> Signal (Vec DispatchPerCycle MemRead) -> Signal (Vec LDUs Read, Vec DispatchPerCycle Fetch, Halt, BackupRegs, CPUState LDUs LDUSlots FPUs FPUSlots CUs CUSlots Height IBuf RBuf DispatchPerCycle)
+cpu' loads fetches = bundle (loadReqs, fetchReqs, halt, backup, state')
     where
     cpustate = register initial state'
-    (state', loadReqs, fetchReqs, halt) = unbundle $ cpu <$> cpustate <*> loads <*> fetches
+    (state', loadReqs, fetchReqs, halt, backup) = unbundle $ cpu <$> cpustate <*> loads <*> fetches
 
 
-topEntity :: Signal (Vec 3 Bit) 
-          -> Signal (Vec 3 (BitVector 16)) 
-          -> Signal (Vec 6 Bit)
-          -> Signal (Vec 6 (BitVector 16)) 
-          -> Signal (Vec 3 Bit, Vec 3 (BitVector 16), Vec 6 Bit, Vec 6 (BitVector 16), Bool) 
-topEntity loadEns loads fetchEns fetches = bundle (loadReqEn, loadReqBits, fetchReqEn, fetchReqBits, halt')
+topEntity :: Signal (Vec LDUs Bit) 
+          -> Signal (Vec LDUs (BitVector 16)) 
+          -> Signal (Vec DispatchPerCycle Bit)
+          -> Signal (Vec DispatchPerCycle (BitVector 16)) 
+          -> Signal (Vec LDUs Bit, Vec LDUs (BitVector 16), Vec DispatchPerCycle Bit, Vec DispatchPerCycle (BitVector 16), Bool, Vec 16 (BitVector 16)) 
+topEntity loadEns loads fetchEns fetches = bundle (loadReqEn, loadReqBits, fetchReqEn, fetchReqBits, halt', backups')
     where
     mkMemRead :: Bit -> BitVector 16 -> MemRead
     mkMemRead 1 w = ReadSome (W w)
     mkMemRead 0 _ = NothingRead
-    loads' = zipWith mkMemRead <$> loadEns <*> loads :: Signal (Vec 3 MemRead)
-    fetches' = zipWith mkMemRead <$> fetchEns <*> fetches :: Signal (Vec 6 MemRead)
-    (loadReqs, fetchReqs, halt) = unbundle $ cpu' loads' fetches'
+    loads' = zipWith mkMemRead <$> loadEns <*> loads :: Signal (Vec LDUs MemRead)
+    fetches' = zipWith mkMemRead <$> fetchEns <*> fetches :: Signal (Vec DispatchPerCycle MemRead)
+    (loadReqs, fetchReqs, halt, backups, _) = unbundle $ cpu' loads' fetches'
     (loadReqEn, loadReqBits) = unbundle $ (unzip . map unMkLoadReq) <$> loadReqs
     unMkLoadReq :: Read -> (Bit, BitVector 16)
     unMkLoadReq NoRead = (0,0) 
@@ -38,3 +51,4 @@ topEntity loadEns loads fetchEns fetches = bundle (loadReqEn, loadReqBits, fetch
     halt' = halt2Bits <$> halt
     halt2Bits DoHalt = True
     halt2Bits DontHalt = False
+    backups' = (\(BackupRegs regs) -> map (\(W x) -> x) regs) <$> backups

@@ -8,6 +8,7 @@ import CPU.RStations (RSEntry(..), RStations(..))
 import CPU.RegisterFile (RegisterFile(..))
 import CPU.ReorderBuffer (ROB(..), Waiting(..))
 import CPU.Buffer (Buffer(..), Count(..))
+import Text.Printf (printf)
 
 data CDBBS x y r = CDBBS (RegisterFile r) (RStations x y r) (ROB r)
 
@@ -62,8 +63,7 @@ updateRobWith (Just (CDBMessage (RobID rob) msg)) (ROB buf (RobID first) next)
         else cyclicNegate (first - rob)
     cyclicNegate x = (maxBound - x) + 1
     (Buffer count items) = buf
-    (Count maxIndex) = succ count
-    invalid = index >= maxIndex
+    invalid = (Count index) > count
     item | invalid   = error "ROB update is trying to access a non-existent element"
          | otherwise = items !! index
     buf' = Buffer count $ replace index (updateRobEntry item msg) items
@@ -86,7 +86,7 @@ updateRobEntry (Waiting fetched@(Fetched pc pred op)) message = case (op, messag
         (Halt,        DoHalt)                        -> Done fetched
         (Ld _ rix,    RegWrite w rix') | rix /= rix' -> error "ROB Ld and CDB Ld disagree on rix"
                                        | otherwise   -> Done (Fetched pc pred (Mov w rix))
-        (Jeq _ _ pc', JumpTaken pc'')  | pc /= pc''  -> error "ROB Jeq and CDB Jeq disagree on pc'"
+        (Jeq _ _ pc', JumpTaken pc'')  | pc' /= pc'' -> error "ROB Jeq and CDB Jeq disagree on pc'" -- $ printf "ROB Jeq and CDB Jeq disagree on pc'. fetched: %s msg: %s" (show fetched) (show message)
                                        | otherwise   -> Done (Fetched pc pred (Jmp pc'))
         (Jeq _ _ _,   JumpNotTaken)                  -> Done (Fetched pc pred (Jmp (pc + 1)))
         (_,           _)                             -> error "Unexpected CDB message received in ROB"

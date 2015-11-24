@@ -24,7 +24,8 @@ twoFree :: KnownNat r => ROB r -> Bool
 twoFree (ROB buf _ _) = let (max, count) = intStats buf in max - count >= 2
 
 robInsert :: KnownNat r => Fetched (Op (RobID r)) -> ROB r -> (RobID r, ROB r)
-robInsert op (ROB buf first next) = (next, ROB (insert' buf $ Waiting op) first (succ next))
+robInsert op (ROB buf first next) | full buf = error "Trying to insert into full ROB"
+                                  | otherwise = (next, ROB (insert' buf $ Waiting op) first (succ next))
 
 robPop :: KnownNat (r+1) => ROB (r+1) -> (Maybe (Fetched (Op (RobID (r+1)))), ROB (r+1))
 robPop rob@(ROB buf first next) = case take buf of

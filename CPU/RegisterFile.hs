@@ -9,7 +9,7 @@ import CPU.Op (Op(..))
 data RegisterFile rob = RegFile (Vec 16 (RVal (RobID rob))) deriving (Show, Eq)
 
 empty :: RegisterFile r
-empty = RegFile $ repeat $ Literal 0x1337
+empty = RegFile $ repeat $ Literal 0x13371337
 
 renameReg :: RIx -> RobID r -> RegisterFile r -> RegisterFile r
 renameReg (RIx rix) newName (RegFile vec) = RegFile $ replace rix (Pending newName) vec
