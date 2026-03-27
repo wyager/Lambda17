@@ -1,8 +1,12 @@
-import CLaSH.Prelude
+import Clash.Prelude
 import Sim.Testbed (loadHexFile, loadHexFile', withRAM)
 import CPU.InstructionSet (parse)
+
+main :: IO ()
 main = do
-    words <- loadHexFile' "mem.hex"
-    mapM (print . parse) words
+    ws <- loadHexFile' "mem.hex"
+    mapM_ (print . parse) ws
     memory <- loadHexFile "mem.hex"
-    mapM putStrLn $ sampleN 10 (withRAM memory)
+    mapM_ putStrLn $ sampleN 10 $
+        withClockResetEnable systemClockGen systemResetGen enableGen $
+        withRAM memory

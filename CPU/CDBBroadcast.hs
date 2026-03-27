@@ -1,6 +1,9 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module CPU.CDBBroadcast (CDBBS(..), process) where 
 
-import CLaSH.Prelude 
+import Clash.Prelude
+import Control.Applicative ((<|>))
 import CPU.CDBMessage (CDBMessage(..), CDBData(..))
 import CPU.Op (Op(..), Fetched(..))
 import CPU.Defs (RVal(..), W, RobID(..), RIx(..))
@@ -11,6 +14,7 @@ import CPU.Buffer (Buffer(..), Count(..))
 import Text.Printf (printf)
 
 data CDBBS x y r = CDBBS (RegisterFile r) (RStations x y r) (ROB r)
+    deriving (Generic, NFDataX)
 
 process :: KnownNat r => Vec n (Maybe (CDBMessage r)) -> CDBBS x y r -> CDBBS x y r
 process messages (CDBBS (RegFile regs) (RStations stations) rob) 
@@ -73,6 +77,7 @@ updateRobWith (Just (CDBMessage (RobID rob) msg)) (ROB buf (RobID first) next)
 -- Mov, Add, Ld -> Mov
 -- Halt -> Halt
 -- Jmp, Jeq -> Jmp
+-- Nop -> Nop (virtual Add from Ldr decomposition; result is discarded)
 updateRobEntry :: Waiting r -> CDBData -> Waiting r
 updateRobEntry (Done _)     _       = error "Trying to update ROB entry for an instruction that's done"
 updateRobEntry (Waiting fetched@(Fetched pc pred op)) message = case (op, message) of
@@ -81,6 +86,7 @@ updateRobEntry (Waiting fetched@(Fetched pc pred op)) message = case (op, messag
                                        | otherwise   -> Done fetched
         (Add _ _ rix, RegWrite w rix') | rix /= rix' -> error "ROB Add and CDB Add disagree on rix"
                                        | otherwise   -> Done (Fetched pc pred (Mov w rix))
+        (Nop,         RegWrite _ _)                  -> Done (Fetched pc pred Nop)
         (Jmp pc',      JumpTaken pc'') | pc' /= pc'' -> error "ROB Jmp and CDB Jmp disagree on pc'"
                                        | otherwise   -> Done fetched
         (Halt,        DoHalt)                        -> Done fetched

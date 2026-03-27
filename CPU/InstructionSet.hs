@@ -1,9 +1,12 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module CPU.InstructionSet (Instruction(..), FetchedInstruction(..), parse) where
 
 import CPU.Defs(W(..), RIx(..), PC(..), Addr(..))
-import CLaSH.Prelude 
+import Clash.Prelude 
 
 data FetchedInstruction = Fetched Instruction PC
+    deriving (Generic, NFDataX)
 
 data Instruction = Mov W RIx
                  | Add RIx RIx RIx
@@ -11,7 +14,7 @@ data Instruction = Mov W RIx
                  | Halt
                  | Ld Addr RIx
                  | Ldr RIx RIx RIx
-                 | Jeq RIx RIx PC deriving Show
+                 | Jeq RIx RIx PC deriving (Show, Eq, Generic, NFDataX)
 
 parse :: W -> Maybe Instruction
 parse (W v) = case opcode of

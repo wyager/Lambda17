@@ -1,11 +1,13 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module CPU.OpBuffer (OpBuffer(fetch_pc), insert, take, empty, insertMany) where
 
-import CLaSH.Prelude hiding (take, empty)
+import Clash.Prelude hiding (take, empty)
 import qualified CPU.Buffer as Buf
 import CPU.Op (Op, Fetched(..))
 import CPU.Defs (PC, Predicted(..), RIx)
 
-data OpBuffer n = IB {fetch_pc :: PC, buf :: Buf.Buffer n (Fetched (Op RIx))} deriving (Show, Eq)
+data OpBuffer n = IB {fetch_pc :: PC, buf :: Buf.Buffer n (Fetched (Op RIx))} deriving (Show, Eq, Generic, NFDataX)
 
 empty :: KnownNat n => OpBuffer n
 empty = IB 0 Buf.empty

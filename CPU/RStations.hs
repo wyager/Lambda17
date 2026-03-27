@@ -1,19 +1,21 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module CPU.RStations (RStations(..), freeSlot, insert, empty, RSEntry(..)) where
 
-import CLaSH.Prelude hiding (empty)
+import Clash.Prelude hiding (empty)
 import CPU.Defs (StationID(..), RobID(..))
 import CPU.Op (Op)
 
 type KN f s r = (KnownNat f, KnownNat s, KnownNat r)
 
-data RSEntry r = RSEntry (Op (RobID r)) (RobID r) deriving (Show, Eq)
+data RSEntry r = RSEntry (Op (RobID r)) (RobID r) deriving (Show, Eq, Generic, NFDataX)
 
 -- That's an earful!
 data RStations fus stations rob = RStations 
                                   (Vec fus 
                                   (Vec stations 
                                   (Maybe 
-                                  (RSEntry rob)))) deriving (Show, Eq)
+                                  (RSEntry rob)))) deriving (Show, Eq, Generic, NFDataX)
 
 empty :: KN f s r => RStations f s r
 empty = RStations $ repeat $ repeat $ Nothing

@@ -1,10 +1,12 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module CPU.BackupRegs (BackupRegs(..), empty, set, restore) where
 
-import CLaSH.Prelude hiding (empty)
+import Clash.Prelude hiding (empty)
 import CPU.RegisterFile (RegisterFile(RegFile))
 import CPU.Defs (W, RIx, RVal(Literal))
 
-data BackupRegs = BackupRegs (Vec 16 W) deriving (Show, Eq)
+data BackupRegs = BackupRegs (Vec 16 W) deriving (Show, Eq, Generic, NFDataX)
 
 empty :: BackupRegs
 empty = BackupRegs (repeat 0x13371337)

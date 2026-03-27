@@ -1,4 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module Playground (CPUState, Playground.empty, cpu) where
 
 import CPU.Dispatch (DispatchState(DS), dispatchN, empty)
@@ -13,7 +15,7 @@ import CPU.BackupRegs (BackupRegs, restore, empty)
 import CPU.Commit (CommitState(CS), Action(Jump,Stop,OK), commitN)
 import CPU.CDBBroadcast (CDBBS(..), process)
 import CPU.Fetch (FetchState, empty, fetch)
-import CLaSH.Prelude hiding (select, Read)
+import Clash.Prelude hiding (select, Read)
 import Data.List (intercalate)
 import Text.Printf (printf)
 
@@ -43,7 +45,7 @@ data CPUState (l  :: Nat)
     fustates :: FUStates l l' f f' c c' rb,
     backups  :: BackupRegs,
     fetching :: FetchState
-}
+} deriving (Generic, NFDataX)
 
 instance (KnownNat ob, KnownNat rb) => Show (CPUState l l' f f' c c' rh ob rb ds) where
     show (CPUState opBuffer regFile stations rob fustates backups fetching) = intercalate "\n\n" [
@@ -58,11 +60,13 @@ instance (KnownNat ob, KnownNat rb) => Show (CPUState l l' f f' c c' rh ob rb ds
 insertOp :: KnownNat ob => CPUState l l' f f' c c' rh ob rb ds -> Fetched (Op RIx) -> CPUState l l' f f' c c' rh ob rb ds
 insertOp state op = state {opBuffer = CPU.OpBuffer.insert (opBuffer state) op}
 
-s1 = insertOp Playground.empty $ Fetched 0 (Predicted 1) (Mov 3 4)
-
-s2 = insertOp s1 $ Fetched 1 (Predicted 2) (Mov 7 8)
-
-res = cpu s2 (repeat NothingRead)
+-- Debug scaffolding disabled: modern GHC rejects these because
+-- Playground.empty is fully polymorphic and the FUsC constraint
+-- (l*l' ~ f*f' ~ c*c' ~ rh) is non-injective, so the type params
+-- can't be inferred. s3 works because empty' pins them concretely.
+-- s1 = insertOp Playground.empty $ Fetched 0 (Predicted 1) (Mov 3 4)
+-- s2 = insertOp s1 $ Fetched 1 (Predicted 2) (Mov 7 8)
+-- res = cpu s2 (repeat NothingRead)
 
 prog = zipWith3 (\pc pred op -> Fetched pc (Predicted pred) op) (iterateI (+1) 0) (iterateI (+1) 1)
 
@@ -108,14 +112,14 @@ cpu (CPUState opBuffer regFile stations rob fustates backups fetching) reads fet
     where
     (fetching', opBuffer', fetchRequests) = fetch fetching opBuffer fetches
     dispatch0 = DS opBuffer' regFile stations rob
-    dispatchn = dispatchN (snat :: SNat dispatches) select dispatch0
+    dispatchn = dispatchN (SNat :: SNat dispatches) select dispatch0
     (DS opBuffer'' regFile' stations' rob') = dispatchn
     (fustates', stations'', cdbmessages, reqs) = step fustates stations' reads
     broadcast0 = CDBBS regFile' stations'' rob'
     broadcast' = process cdbmessages broadcast0
     (CDBBS regFile'' stations''' rob'') = broadcast'
     commit0 = CS backups OK rob''
-    commitn = commitN (snat :: SNat dispatches) commit0
+    commitn = commitN (SNat :: SNat dispatches) commit0
     (CS backups' action rob''') = commitn
     halt = case action of
         Stop -> DoHalt
@@ -123,7 +127,7 @@ cpu (CPUState opBuffer regFile stations rob fustates backups fetching) reads fet
     state' = case action of
         OK      -> CPUState opBuffer'' regFile'' stations''' rob''' fustates' backups' fetching'
         Jump pc -> reset pc backups'
-        Stop    -> error "Trying to run after a halt!"
+        Stop    -> CPUState opBuffer regFile stations rob fustates backups fetching  -- freeze, not error
     debug = state'
 
 reset :: forall l l' f f' c c' rh ob rb ds . (FUsC l l' f f' c c' rh, KnownNat ob, KnownNat rb) 

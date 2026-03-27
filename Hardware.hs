@@ -1,7 +1,8 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Hardware (topEntity, cpu') where
 
-import CLaSH.Prelude hiding (empty, Read)
-import CPU.Defs (Read(..), MemRead(..), Fetch(..), Halt(..), Addr(..), PC(..), W(..))
+import Clash.Prelude hiding (empty, Read)
+import CPU.Defs (S, Clk, Read(..), MemRead(..), Fetch(..), Halt(..), Addr(..), PC(..), W(..))
 import Playground (CPUState, empty, cpu)
 import CPU.BackupRegs (BackupRegs(..))
 
@@ -17,32 +18,44 @@ type IBuf = 16
 type RBuf = 16
 type DispatchPerCycle = 2
 
-initial :: CPUState LDUs LDUSlots FPUs FPUSlots CUs CUSlots Height IBuf RBuf DispatchPerCycle
+type State = CPUState LDUs LDUSlots FPUs FPUSlots CUs CUSlots Height IBuf RBuf DispatchPerCycle
+
+initial :: State
 initial = Playground.empty
 
-cpu' :: Signal (Vec LDUs MemRead) -> Signal (Vec DispatchPerCycle MemRead) -> Signal (Vec LDUs Read, Vec DispatchPerCycle Fetch, Halt, BackupRegs, CPUState LDUs LDUSlots FPUs FPUSlots CUs CUSlots Height IBuf RBuf DispatchPerCycle)
+cpu' :: Clk
+     => S (Vec LDUs MemRead)
+     -> S (Vec DispatchPerCycle MemRead)
+     -> S (Vec LDUs Read, Vec DispatchPerCycle Fetch, Halt, BackupRegs, State)
 cpu' loads fetches = bundle (loadReqs, fetchReqs, halt, backup, state')
     where
     cpustate = register initial state'
     (state', loadReqs, fetchReqs, halt, backup) = unbundle $ cpu <$> cpustate <*> loads <*> fetches
 
+type Out = ( Vec LDUs Bit, Vec LDUs (BitVector 16)
+           , Vec DispatchPerCycle Bit, Vec DispatchPerCycle (BitVector 16)
+           , Bool, Vec 16 (BitVector 16) )
 
-topEntity :: Signal (Vec LDUs Bit) 
-          -> Signal (Vec LDUs (BitVector 16)) 
-          -> Signal (Vec DispatchPerCycle Bit)
-          -> Signal (Vec DispatchPerCycle (BitVector 16)) 
-          -> Signal (Vec LDUs Bit, Vec LDUs (BitVector 16), Vec DispatchPerCycle Bit, Vec DispatchPerCycle (BitVector 16), Bool, Vec 16 (BitVector 16)) 
-topEntity loadEns loads fetchEns fetches = bundle (loadReqEn, loadReqBits, fetchReqEn, fetchReqBits, halt', backups')
+-- Factored out so topEntity's withClockResetEnable scope encloses the
+-- call to cpu' (which needs HiddenClockResetEnable).
+adapter :: Clk
+        => S (Vec LDUs Bit)
+        -> S (Vec LDUs (BitVector 16))
+        -> S (Vec DispatchPerCycle Bit)
+        -> S (Vec DispatchPerCycle (BitVector 16))
+        -> S Out
+adapter loadEns loads fetchEns fetches =
+    bundle (loadReqEn, loadReqBits, fetchReqEn, fetchReqBits, haltL, backupsL)
     where
     mkMemRead :: Bit -> BitVector 16 -> MemRead
     mkMemRead 1 w = ReadSome (W w)
-    mkMemRead 0 _ = NothingRead
-    loads' = zipWith mkMemRead <$> loadEns <*> loads :: Signal (Vec LDUs MemRead)
-    fetches' = zipWith mkMemRead <$> fetchEns <*> fetches :: Signal (Vec DispatchPerCycle MemRead)
+    mkMemRead _ _ = NothingRead
+    loads'   = zipWith mkMemRead <$> loadEns  <*> loads   :: S (Vec LDUs MemRead)
+    fetches' = zipWith mkMemRead <$> fetchEns <*> fetches :: S (Vec DispatchPerCycle MemRead)
     (loadReqs, fetchReqs, halt, backups, _) = unbundle $ cpu' loads' fetches'
     (loadReqEn, loadReqBits) = unbundle $ (unzip . map unMkLoadReq) <$> loadReqs
     unMkLoadReq :: Read -> (Bit, BitVector 16)
-    unMkLoadReq NoRead = (0,0) 
+    unMkLoadReq NoRead = (0,0)
     unMkLoadReq (Read (Addr w)) = (1,w)
     (fetchReqEn, fetchReqBits) = unbundle $ (unzip . map unMkFetchReq) <$> fetchReqs
     unMkFetchReq :: Fetch -> (Bit, BitVector 16)
@@ -52,3 +65,27 @@ topEntity loadEns loads fetchEns fetches = bundle (loadReqEn, loadReqBits, fetch
     halt2Bits DoHalt = True
     halt2Bits DontHalt = False
     backups' = (\(BackupRegs regs) -> map (\(W x) -> x) regs) <$> backups
+    -- Latch halt; freeze backup snapshot once halted. cpu keeps running
+    -- after Halt (Playground.cpu's state' is `error` on Stop, and
+    -- commitN restarts with OK each cycle) so backups' is undefined
+    -- on post-Halt cycles.
+    haltL = register False (haltL .||. halt')
+    backupsL = register (repeat 0) (mux haltL backupsL backups')
+
+topEntity :: Clock System -> Reset System
+          -> S (Vec LDUs Bit)
+          -> S (Vec LDUs (BitVector 16))
+          -> S (Vec DispatchPerCycle Bit)
+          -> S (Vec DispatchPerCycle (BitVector 16))
+          -> S Out
+topEntity clk rst a b c d =
+    withClockResetEnable clk rst enableGen (adapter a b c d)
+{-# ANN topEntity
+  (Synthesize
+    { t_name   = "lambda17"
+    , t_inputs = [ PortName "clk", PortName "rst"
+                 , PortName "loadEns", PortName "loads"
+                 , PortName "fetchEns", PortName "fetches" ]
+    , t_output = PortName "out"
+    }) #-}
+{-# NOINLINE topEntity #-}

@@ -1,16 +1,21 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module CPU.Commit (Action(..), CommitState(..), commitN) where
 
-import CLaSH.Prelude
+import Clash.Prelude
 import CPU.ReorderBuffer (ROB, robPop)
-import CPU.Op (Fetched(..), Op(Mov,Jmp,Halt)) -- Theoretically we should only see these 3
+import CPU.Op (Fetched(..), Op(Mov,Jmp,Halt,Nop))
 import CPU.BackupRegs (BackupRegs, set)
 import CPU.Defs (PC, Predicted(..))
 
 
-data Action = Jump PC | Stop | OK deriving (Show, Eq)
+data Action = Jump PC | Stop | OK deriving (Show, Eq, Generic, NFDataX)
 
-data CommitState r = CS BackupRegs Action (ROB r) deriving (Show, Eq)
+data CommitState r = CS BackupRegs Action (ROB r) deriving (Show, Eq, Generic, NFDataX)
 
+-- Commit sees only Mov, Jmp, Halt, or Nop. Mov writes backup regs;
+-- Jmp checks the branch prediction; Halt stops; Nop retires the
+-- placeholder slot used by the virtual Add half of an Ldr.
 commit1 :: KnownNat (r+1) => CommitState (r+1) -> CommitState (r+1)
 commit1 old@(CS backup Stop     rob) = old -- We are halting. Stop
 commit1 old@(CS backup (Jump _) rob) = old -- We are jumping. Stop
@@ -22,6 +27,7 @@ commit1 old@(CS backup OK       rob) = case robPop rob of
                 Mov w r -> set r w backup
                 Jmp _   -> backup
                 Halt    -> backup
+                Nop     -> backup
                 _       -> error "Unexpected instruction in ROB commit"
             action = case op of
                 Halt    -> Stop
@@ -29,6 +35,7 @@ commit1 old@(CS backup OK       rob) = case robPop rob of
                     then OK
                     else Jump pc'
                 Mov _ _ -> OK
+                Nop     -> OK
                 _       -> error "Unexpected instruction in ROB commit"
 
 commitN :: KnownNat (r+1) => SNat n -> CommitState (r+1) -> CommitState (r+1)

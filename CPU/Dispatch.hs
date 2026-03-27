@@ -1,9 +1,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module CPU.Dispatch (CPU.Dispatch.empty, dispatch, dispatchN, DispatchState(..)) where
 
 import Text.Printf
-import CLaSH.Prelude hiding (take, empty)
+import Clash.Prelude hiding (take, empty)
 import Data.Maybe (fromJust)
 import CPU.Defs (RVal(Pending, Literal), RIx, Predicted(..), StationID(..), RobID(..))
 import CPU.Op (Fetched(..), Op(..))
@@ -15,7 +17,7 @@ import CPU.ReorderBuffer as ROB (ROB, oneFree, twoFree, robInsert, empty)
 data DispatchState n f s r = DS {opBuffer :: (OpBuffer n),
                                  regFile  :: (RegisterFile r),
                                  stations :: (RStations f s r),
-                                 rob      :: (ROB r) } deriving (Eq)
+                                 rob      :: (ROB r) } deriving (Eq, Generic, NFDataX)
 
 instance KN n f s r => Show (DispatchState n f s r) where
     show (DS ob rf rs rob) = printf "Dispatch:\n  %s\n  %s\n  %s\n  %s" (show ob) (show rf) (show rs) (show rob)
@@ -41,10 +43,16 @@ dispatch select state@(DS insts regs stations rob) = case take insts of
             else Left state
         where
         thereIsRobSpace = twoFree rob
-        -- Assumption: Add stations and Ld stations are disjoint
-        fakeAdd = copyFrom regs $ Add a b 0-- (error "Error: Virtual add register should not be used!")
+        -- Assumption: Add stations and Ld stations are disjoint.
+        -- The virtual Add's dest register is a dummy (we use r0 here).
+        -- The Add goes into the reservation station so it executes and
+        -- broadcasts the computed address on the CDB for the Ld to pick
+        -- up. But the ROB entry is a Nop, so commit does not write the
+        -- result to any backup register. Previously the ROB held the Add
+        -- and commit would clobber backup register 0.
+        fakeAdd = copyFrom regs $ Add a b 0
         addFu = select fakeAdd
-        addSlot = freeSlot stations addFu 
+        addSlot = freeSlot stations addFu
         thereIsAddSpace | (Just _) <- addSlot = True
                         | Nothing  <- addSlot = False
         addStation = StationID addFu (fromJust addSlot)
@@ -55,11 +63,11 @@ dispatch select state@(DS insts regs stations rob) = case take insts of
         thereIsLdSpace | (Just _) <- ldSlot = True
                        | Nothing  <- ldSlot = False
         ldStation = StationID ldFu (fromJust ldSlot)
-        (addID, rob')  = robInsert (Fetched pc pred fakeAdd) rob
-        (ldID,  rob'') = robInsert (Fetched pc pred fakeLd)  rob'
+        (addID, rob')  = robInsert (Fetched pc pred Nop)    rob
+        (ldID,  rob'') = robInsert (Fetched pc pred fakeLd) rob'
         regs' = renameReg r ldID regs
-        stations' = insert addStation (RSEntry fakeAdd addID) 
-                  $ insert ldStation  (RSEntry fakeLd ldID) 
+        stations' = insert addStation (RSEntry fakeAdd addID)
+                  $ insert ldStation  (RSEntry fakeLd ldID)
                   $ stations
 
     (insts', Just fetched@(Fetched pc pred op)) ->

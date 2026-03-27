@@ -1,12 +1,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module CPU.RegisterFile (RegisterFile(..), renameReg, copyFrom, empty) where
 
-import CLaSH.Prelude hiding (empty)
+import Clash.Prelude hiding (empty)
 import CPU.Defs (RIx(..), RVal(Literal,Pending), RobID)
 import CPU.Op (Op(..))
 
-data RegisterFile rob = RegFile (Vec 16 (RVal (RobID rob))) deriving (Show, Eq)
+data RegisterFile rob = RegFile (Vec 16 (RVal (RobID rob))) deriving (Show, Eq, Generic, NFDataX)
 
 empty :: RegisterFile r
 empty = RegFile $ repeat $ Literal 0x13371337
@@ -22,7 +24,8 @@ copyFrom (RegFile regs) op = case op of
         Add a b r -> Add (update a) (update b) r
         Ld a r    -> Ld  (update a)            r
         Ldr a b r -> Ldr (update a) (update b) r
-        Jeq a b p -> Jeq (update a) (update b) p 
+        Jeq a b p -> Jeq (update a) (update b) p
+        Nop       -> Nop
     where
     update :: RVal RIx -> RVal (RobID r)
     update (Literal w)   = Literal w

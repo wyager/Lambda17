@@ -1,13 +1,21 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module CPU.Op (Fetched(..), Op(..), grounded, convert) where
 
-import CLaSH.Prelude 
+import Clash.Prelude 
 import CPU.Defs (PC(..), Predicted(..), RIx(..), RVal(..), W(..), Addr(..), StationID(..))
 import qualified CPU.InstructionSet as I
 
-data Fetched op = Fetched PC (Predicted PC) op deriving (Show, Eq)
+data Fetched op = Fetched PC (Predicted PC) op deriving (Show, Eq, Generic, NFDataX)
 
 -- rix is either RIx (for instrs still in the buffer)
 -- or RobID (for instrs that have been dispatched)
+--
+-- Nop is a pseudo-op used only in the ROB for the virtual Add half of
+-- an Ldr decomposition. The Add stays in the reservation station and
+-- broadcasts on the CDB so the Ld can pick up the computed address, but
+-- the ROB slot holds a Nop so commit does not write to a real register.
+-- Without this, the virtual Add's result would clobber backup register 0.
 data Op rix = Mov W RIx
             | Add (RVal rix) (RVal rix) RIx
             | Jmp PC
@@ -15,7 +23,8 @@ data Op rix = Mov W RIx
             | Ld  (RVal rix) RIx
             | Ldr (RVal rix) (RVal rix) RIx
             | Jeq (RVal rix) (RVal rix) PC
-            deriving (Eq, Show)
+            | Nop
+            deriving (Eq, Show, Generic, NFDataX)
 
 grounded :: Op a -> Bool
 grounded op = case op of
@@ -26,6 +35,7 @@ grounded op = case op of
     Ld  (Literal _) _             -> True
     Jeq (Literal _) (Literal _) _ -> True
     Ldr (Literal _) (Literal _) _ -> True
+    Nop                           -> True
     _                             -> False
 
 convert :: I.FetchedInstruction -> Fetched (Op RIx)
