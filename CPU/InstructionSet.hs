@@ -14,7 +14,7 @@ data Instruction = Mov W RIx
                  | Halt
                  | Ld Addr RIx
                  | Ldr RIx RIx RIx
-                 | Jeq RIx RIx PC deriving (Show, Generic, NFDataX)
+                 | Jeq RIx RIx PC deriving (Show, Eq, Generic, NFDataX)
 
 parse :: W -> Maybe Instruction
 parse (W v) = case opcode of

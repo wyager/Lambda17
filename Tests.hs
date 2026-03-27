@@ -2,6 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- | Unit tests for the Lambda17 Tomasulo OOO CPU.
 --
@@ -38,7 +39,7 @@ import CPU.Dispatch (DispatchState(..))
 import qualified CPU.Dispatch as D
 import CPU.OpBuffer (OpBuffer)
 import qualified CPU.OpBuffer as OB
-import CPU.FunctionalUnits (select)
+import qualified CPU.FunctionalUnits as FU
 
 -- Test harness ---------------------------------------------------------------
 
@@ -165,12 +166,15 @@ rsTests =
 
 type TestDS = DispatchState 4 3 4 8
 
+dispatchTest :: TestDS -> Either TestDS TestDS
+dispatchTest = D.dispatch FU.select
+
 ldrRegressionTests :: [(String, Result)]
 ldrRegressionTests =
     [ expectTrue "Ldr dispatch puts Nop in ROB" $
         -- After dispatching an Ldr, the first ROB entry (virtual Add slot)
         -- should hold a Nop, not an Add targeting r0.
-        case D.dispatch select dsLdr of
+        case dispatchTest dsLdr of
           Right ds' ->
             let ROB.ROB b _ _ = rob ds'
                 (_, first) = Buf.take b
@@ -182,16 +186,16 @@ ldrRegressionTests =
     , expectTrue "Ldr dispatch puts Add in RS" $
         -- The reservation station must still hold a real Add so the
         -- functional unit computes and broadcasts the address.
-        case D.dispatch select dsLdr of
+        case dispatchTest dsLdr of
           Right ds' ->
             let RStations vec = stations ds'
-                fpuCol = vec !! (select fakeAddProbe)
+                fpuCol = vec !! (FU.select fakeAddProbe)
             in P.any isAddEntry (toList fpuCol)
           Left _ -> False
 
     , expectTrue "Ldr dispatch renames only target reg" $
         -- Dispatching Ldr r1 r2 r3 should rename r3, not r0.
-        case D.dispatch select dsLdr of
+        case dispatchTest dsLdr of
           Right ds' ->
             let RegFile v = regFile ds'
                 r0 = v !! (0 :: Index 16)
@@ -205,7 +209,7 @@ ldrRegressionTests =
     -- Initial dispatch state with an Ldr r1 r2 -> r3 in the op buffer
     ldrOp   = Op.Ldr (Pending (RIx 1)) (Pending (RIx 2)) (RIx 3) :: Op RIx
     ldrF    = Fetched (PC 0) (Predicted (PC 1)) ldrOp
-    dsLdr   = (D.empty :: TestDS) { opBuffer = OB.insert OB.empty ldrF }
+    dsLdr   = (D.empty :: TestDS) { opBuffer = OB.insert (OB.empty :: OpBuffer 4) ldrF }
 
     -- A probe Add just for asking select which FU column Adds go to
     fakeAddProbe = Op.Add (Literal (W 0)) (Literal (W 0)) (RIx 0) :: Op (RobID 8)
