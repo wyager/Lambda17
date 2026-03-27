@@ -60,10 +60,6 @@ instance (KnownNat ob, KnownNat rb) => Show (CPUState l l' f f' c c' rh ob rb ds
 insertOp :: KnownNat ob => CPUState l l' f f' c c' rh ob rb ds -> Fetched (Op RIx) -> CPUState l l' f f' c c' rh ob rb ds
 insertOp state op = state {opBuffer = CPU.OpBuffer.insert (opBuffer state) op}
 
--- Debug scaffolding disabled: modern GHC rejects these because
--- Playground.empty is fully polymorphic and the FUsC constraint
--- (l*l' ~ f*f' ~ c*c' ~ rh) is non-injective, so the type params
--- can't be inferred. s3 works because empty' pins them concretely.
 -- s1 = insertOp Playground.empty $ Fetched 0 (Predicted 1) (Mov 3 4)
 -- s2 = insertOp s1 $ Fetched 1 (Predicted 2) (Mov 7 8)
 -- res = cpu s2 (repeat NothingRead)

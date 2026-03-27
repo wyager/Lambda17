@@ -69,8 +69,6 @@ step (FUStates memStates fpStates ctrlStates) (RStations (fps :> mems :> ctrls :
     ctrls''' = tilps ctrls''
     msgs = memmsgs ++ fpmsgs ++ ctrlmsgs
 
--- unzip4 is now in Clash.Prelude (wasn't in CLaSH 0.x) — local definition removed.
-
 data LDUState r = Loading RIx (RobID r) | Empty deriving (Show, Generic, NFDataX)
 stepMem :: N n => MemRead -> Vec n (Maybe (RSEntry r)) -> LDUState r -> (LDUState r, Vec n (Maybe (RSEntry r)), Maybe (CDBMessage r), Read)
 stepMem read instrs (Loading rix rob) = case read of
