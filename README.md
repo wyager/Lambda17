@@ -41,7 +41,7 @@ Same 16-bit encoding as Lambda16 (see `CPU/InstructionSet.hs`):
 
 ## Build
 
-See `BUILD.md` for modern Clash (1.8.2) setup. Short version:
+See `BUILD.md` for setup. Short version:
 
 ```bash
 clash --verilog Hardware.hs -outputdir build
@@ -54,9 +54,3 @@ clash Main.hs -outputdir build && ./Main
 ```
 
 Loads `mem.hex`, dumps the decoded program, and runs 10 cycles.
-
-## Status
-
-The git history notes "Simulation working, but not hardware..." — the
-Clash-generated HDL may not have been fully validated on real silicon.
-The simulation harness in `Sim/` works.

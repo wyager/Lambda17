@@ -36,7 +36,7 @@ functional units, and retire in program order from the ROB.
 | 5 | Broadcast | `CPU.CDBBroadcast` | Every CDB message updates (a) the register file, (b) all reservation-station entries that were `Pending` on that ROB slot, and (c) the ROB entry itself, marking it `Done` with its committed form. |
 | 6 | Commit    | `CPU.Commit`     | Pop up to `d` `Done` entries from the ROB head in program order. `Mov` writes backup regs; `Jmp` checks prediction; `Halt` stops; `Nop` retires silently. A mispredict flushes the pipeline and restores from backup. |
 
-## Ldr decomposition and the r0-clobber fix
+## Ldr decomposition
 
 `Ldr rA rB rT` (load from address `rA + rB` into `rT`) is not a hardware
 primitive. Dispatch decomposes it into two micro-ops:
@@ -46,15 +46,10 @@ primitive. Dispatch decomposes it into two micro-ops:
 2. A **dependent Ld** waits for the Add's ROB slot, picks up the address
    from the CDB, and loads from memory into `rT`.
 
-The virtual Add has no architectural destination. The original code used
-`r0` as a dummy target, which meant that when the Add's ROB entry
-committed, `commit1` wrote the sum to backup register 0.
-
-**Fix**: the ROB slot for the virtual Add holds `Nop` instead of `Add`.
-`updateRobEntry` marks the Nop `Done` when it sees the CDB `RegWrite`,
-and `commit1` retires the Nop without touching backup regs. The Add
-itself still lives in the reservation station, executes, and broadcasts —
-so the Ld still receives the computed address.
+The virtual Add has no architectural destination. Its ROB slot holds `Nop`
+instead of `Add`, so `commit1` retires it without touching backup regs.
+The Add itself still lives in the reservation station, executes, and
+broadcasts — so the Ld still receives the computed address.
 
 ## Functional units
 
