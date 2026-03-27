@@ -2,8 +2,22 @@
 
 ## Requirements
 
-Same as Lambda16 — GHC 9.0–9.6, `clash-ghc-1.8.2`, `clash-prelude-1.8.2`
-(pinned), plus the three typechecker plugins.
+- GHC 9.0–9.6 (tested with 9.4.7)
+- `clash-ghc` 1.8.2
+- `clash-prelude` 1.8.2 (must match `clash-ghc` exactly — Clash has a hard
+  ABI check)
+- The three GHC typechecker plugins Clash uses: `ghc-typelits-knownnat`,
+  `ghc-typelits-natnormalise`, `ghc-typelits-extra`
+
+Install via cabal:
+
+```bash
+cabal update
+cabal install clash-ghc-1.8.2 --installdir=$HOME/.local/bin --install-method=copy
+cabal install --lib clash-prelude-1.8.2 \
+    ghc-typelits-knownnat ghc-typelits-natnormalise ghc-typelits-extra \
+    --constraint="clash-prelude==1.8.2"
+```
 
 ## Generate HDL
 
