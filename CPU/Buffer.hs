@@ -60,8 +60,9 @@ empty = Buffer Empty (repeat $ errorX "Default buffer value")
 
 -- Force insertion, no overflow check
 insert' :: (KnownNat n) => Buffer n a -> a -> Buffer n a
-insert' buf@(Buffer count vec) a | full buf  = error "Inserting into full buffer" 
-                               a | otherwise = Buffer (succ count) (replace count a vec)
+insert' buf@(Buffer count vec) a
+    | full buf  = error "Inserting into full buffer"
+    | otherwise = Buffer (succ count) (replace count a vec)
 
 insert :: (KnownNat n) => Buffer n a -> a -> Buffer n a
 insert buf@(Buffer count vec) a = if full buf

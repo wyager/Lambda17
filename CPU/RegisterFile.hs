@@ -24,7 +24,8 @@ copyFrom (RegFile regs) op = case op of
         Add a b r -> Add (update a) (update b) r
         Ld a r    -> Ld  (update a)            r
         Ldr a b r -> Ldr (update a) (update b) r
-        Jeq a b p -> Jeq (update a) (update b) p 
+        Jeq a b p -> Jeq (update a) (update b) p
+        Nop       -> Nop
     where
     update :: RVal RIx -> RVal (RobID r)
     update (Literal w)   = Literal w
