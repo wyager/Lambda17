@@ -1,6 +1,9 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module CPU.CDBBroadcast (CDBBS(..), process) where 
 
-import CLaSH.Prelude 
+import Clash.Prelude
+import Control.Applicative ((<|>))
 import CPU.CDBMessage (CDBMessage(..), CDBData(..))
 import CPU.Op (Op(..), Fetched(..))
 import CPU.Defs (RVal(..), W, RobID(..), RIx(..))
@@ -11,6 +14,7 @@ import CPU.Buffer (Buffer(..), Count(..))
 import Text.Printf (printf)
 
 data CDBBS x y r = CDBBS (RegisterFile r) (RStations x y r) (ROB r)
+    deriving (Generic, NFDataX)
 
 process :: KnownNat r => Vec n (Maybe (CDBMessage r)) -> CDBBS x y r -> CDBBS x y r
 process messages (CDBBS (RegFile regs) (RStations stations) rob) 

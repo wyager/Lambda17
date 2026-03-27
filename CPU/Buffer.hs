@@ -1,12 +1,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module CPU.Buffer (Buffer(..), Count(..), empty, insert, insert', full, take, intStats) where
 
-import CLaSH.Prelude hiding (drop, empty, take) 
+import Clash.Prelude hiding (drop, empty, take) 
 import Text.Printf (printf)
 import qualified Prelude as P
 
 
-data Count n = Empty | Count (Index n) deriving (Eq, Ord)
+data Count n = Empty | Count (Index n) deriving (Eq, Ord, Generic, NFDataX)
 
 instance KnownNat n => Enum (Count n) where
     succ Empty = Count 0
@@ -29,6 +31,7 @@ count (Buffer c _) = c
 
 -- Ring buffer
 data Buffer n a = Buffer (Count n) (Vec n a)
+    deriving (Generic, NFDataX)
 
 instance (KnownNat n, Eq a) => Eq (Buffer n a) where
     (Buffer ca a) == (Buffer cb b)
@@ -52,8 +55,8 @@ instance (Show a, KnownNat n) => Show (Buffer n a) where
 intStats :: (KnownNat n) => Buffer n a -> (Int, Int)
 intStats buf = (fromEnum (maxCount buf), fromEnum (count buf))
 
-empty :: (KnownNat n) => Buffer n a
-empty = Buffer Empty (repeat $ error "Default buffer value")
+empty :: (KnownNat n, NFDataX a) => Buffer n a
+empty = Buffer Empty (repeat $ errorX "Default buffer value")
 
 -- Force insertion, no overflow check
 insert' :: (KnownNat n) => Buffer n a -> a -> Buffer n a
@@ -71,19 +74,19 @@ insertMany buf vec = foldl insert' buf vec
     insert' buf Nothing  = buf
     insert' buf (Just a) = insert buf a
 
-take :: (KnownNat (n+1)) => Buffer (n+1) a -> (Buffer (n+1) a, Maybe a)
+take :: (KnownNat (n+1), NFDataX a) => Buffer (n+1) a -> (Buffer (n+1) a, Maybe a)
 take (Buffer Empty vec) = (Buffer Empty vec, Nothing)
-take (Buffer count vec) = (Buffer (pred count) (vec <<+ undefined), Just (head vec))
+take (Buffer count vec) = (Buffer (pred count) (vec <<+ errorX "Buffer tail"), Just (head vec))
 
-drop :: (KnownNat n) => Buffer n a -> Buffer n a
+drop :: (KnownNat n, NFDataX a) => Buffer n a -> Buffer n a
 drop (Buffer Empty vec) = Buffer Empty vec
-drop (Buffer count vec) = Buffer (pred count) (vec <<+ undefined)
+drop (Buffer count vec) = Buffer (pred count) (vec <<+ errorX "Buffer tail")
 
 peek :: (KnownNat (n+1)) => Buffer (n+1) a -> Maybe a
 peek (Buffer Empty vec) = Nothing
 peek (Buffer count vec) = Just (head vec)
 
-takeMany :: forall m n a . (KnownNat (n+1), KnownNat (m+1)) => Buffer (n+1) a -> (Buffer (n+1) a, Vec (m+1) (Maybe a))
+takeMany :: forall m n a . (KnownNat (n+1), KnownNat (m+1), NFDataX a) => Buffer (n+1) a -> (Buffer (n+1) a, Vec (m+1) (Maybe a))
 takeMany buf = (drop (last drops), map peek drops)
     where drops = iterateI drop buf :: Vec (m+1) (Buffer (n+1) a)
 

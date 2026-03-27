@@ -1,15 +1,17 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module CPU.Commit (Action(..), CommitState(..), commitN) where
 
-import CLaSH.Prelude
+import Clash.Prelude
 import CPU.ReorderBuffer (ROB, robPop)
 import CPU.Op (Fetched(..), Op(Mov,Jmp,Halt)) -- Theoretically we should only see these 3
 import CPU.BackupRegs (BackupRegs, set)
 import CPU.Defs (PC, Predicted(..))
 
 
-data Action = Jump PC | Stop | OK deriving (Show, Eq)
+data Action = Jump PC | Stop | OK deriving (Show, Eq, Generic, NFDataX)
 
-data CommitState r = CS BackupRegs Action (ROB r) deriving (Show, Eq)
+data CommitState r = CS BackupRegs Action (ROB r) deriving (Show, Eq, Generic, NFDataX)
 
 commit1 :: KnownNat (r+1) => CommitState (r+1) -> CommitState (r+1)
 commit1 old@(CS backup Stop     rob) = old -- We are halting. Stop

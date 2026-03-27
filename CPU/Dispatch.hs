@@ -1,9 +1,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module CPU.Dispatch (CPU.Dispatch.empty, dispatch, dispatchN, DispatchState(..)) where
 
 import Text.Printf
-import CLaSH.Prelude hiding (take, empty)
+import Clash.Prelude hiding (take, empty)
 import Data.Maybe (fromJust)
 import CPU.Defs (RVal(Pending, Literal), RIx, Predicted(..), StationID(..), RobID(..))
 import CPU.Op (Fetched(..), Op(..))
@@ -15,7 +17,7 @@ import CPU.ReorderBuffer as ROB (ROB, oneFree, twoFree, robInsert, empty)
 data DispatchState n f s r = DS {opBuffer :: (OpBuffer n),
                                  regFile  :: (RegisterFile r),
                                  stations :: (RStations f s r),
-                                 rob      :: (ROB r) } deriving (Eq)
+                                 rob      :: (ROB r) } deriving (Eq, Generic, NFDataX)
 
 instance KN n f s r => Show (DispatchState n f s r) where
     show (DS ob rf rs rob) = printf "Dispatch:\n  %s\n  %s\n  %s\n  %s" (show ob) (show rf) (show rs) (show rob)

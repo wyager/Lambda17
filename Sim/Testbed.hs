@@ -1,8 +1,9 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Sim.Testbed (loadHexFile, loadHexFile', withRAM) where
 
-import CLaSH.Prelude 
+import Clash.Prelude
 
-import Hardware (cpu') 
+import Hardware (cpu')
 
 import Sim.Mem (mem)
 
@@ -10,7 +11,7 @@ import Numeric (readHex)
 
 import CPU.BackupRegs (BackupRegs)
 
-import CPU.Defs (W(..), Halt)
+import CPU.Defs (S, Clk, W(..), Halt)
 
 import Text.Printf (printf)
 
@@ -30,7 +31,7 @@ loadHexFile path = do
     let vec = map P.head $ iterateI P.tail list
     return vec
 
-withRAM :: Vec 65536 W -> Signal String
+withRAM :: Clk => Vec 65536 W -> S String
 withRAM ram = output
     where
     (loads, fetches) = unbundle $ mem 100 1 ram loadReqs fetchReqs

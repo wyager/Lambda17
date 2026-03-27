@@ -1,8 +1,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module CPU.FunctionalUnits (FUStates, FUsC, select, step, empty) where
 
-import CLaSH.Prelude hiding (select, split, Read, empty)
+import Clash.Prelude hiding (select, split, Read, empty)
 import CPU.Defs (RobID, RVal(..), Read(..), MemRead(..), RIx, W(w), Addr(Addr))
 import CPU.Op (Op(..), grounded)
 import CPU.CDBMessage (CDBMessage(..), CDBData(..))
@@ -29,7 +31,7 @@ tilps = concat . transpose
 data FUStates (mem  :: Nat) (mem'  :: Nat) 
               (fp   :: Nat) (fp'   :: Nat)
               (ctrl :: Nat) (ctrl' :: Nat)
-              (r    :: Nat) = FUStates (Vec mem (LDUState r)) (Vec fp FPUState) (Vec ctrl CUState) deriving Show
+              (r    :: Nat) = FUStates (Vec mem (LDUState r)) (Vec fp FPUState) (Vec ctrl CUState) deriving (Show, Generic, NFDataX)
 
 empty :: FUsC m m' f f' c c' y => FUStates m m' f f' c c' r
 empty = FUStates (repeat initialMem) (repeat initialFP) (repeat initialCtrl)
@@ -67,14 +69,9 @@ step (FUStates memStates fpStates ctrlStates) (RStations (fps :> mems :> ctrls :
     ctrls''' = tilps ctrls''
     msgs = memmsgs ++ fpmsgs ++ ctrlmsgs
 
-unzip4 :: Vec n (a,b,c,d) -> (Vec n a, Vec n b, Vec n c, Vec n d)
-unzip4 xs = ( map (\(w,_,_,_) -> w) xs
-            , map (\(_,x,_,_) -> x) xs
-            , map (\(_,_,y,_) -> y) xs
-            , map (\(_,_,_,z) -> z) xs
-            )
+-- unzip4 is now in Clash.Prelude (wasn't in CLaSH 0.x) — local definition removed.
 
-data LDUState r = Loading RIx (RobID r) | Empty deriving Show
+data LDUState r = Loading RIx (RobID r) | Empty deriving (Show, Generic, NFDataX)
 stepMem :: N n => MemRead -> Vec n (Maybe (RSEntry r)) -> LDUState r -> (LDUState r, Vec n (Maybe (RSEntry r)), Maybe (CDBMessage r), Read)
 stepMem read instrs (Loading rix rob) = case read of
     NothingRead -> (Loading rix rob, instrs, Nothing, NoRead)
@@ -94,7 +91,7 @@ stepMem read instrs Empty = case read of
             Ld (Literal addr) rix -> (Loading rix rob, instrs', Nothing, Read $ Addr $ w $ addr) -- Only read at transition. It resets memory thing
             _                     -> error "Invalid instruction moved into LDU"
 
-data FPUState = FPUState deriving Show
+data FPUState = FPUState deriving (Show, Generic, NFDataX)
 stepFP :: N n => Vec n (Maybe (RSEntry r)) -> FPUState -> (FPUState, Vec n (Maybe (RSEntry r)), Maybe (CDBMessage r))
 stepFP instrs FPUState = case take1 instrs of
     (Nothing, instrs') -> (FPUState, instrs', Nothing)
@@ -103,7 +100,7 @@ stepFP instrs FPUState = case take1 instrs of
         Add (Literal a) (Literal b) rix -> (,,) FPUState instrs' $ Just $ CDBMessage rob (RegWrite (a+b) rix)
         _ -> error "Invalid instruction moved into FPU"
 
-data CUState = CUState deriving Show
+data CUState = CUState deriving (Show, Generic, NFDataX)
 stepCtrl :: N n => Vec n (Maybe (RSEntry r)) -> CUState -> (CUState,  Vec n (Maybe (RSEntry r)), Maybe (CDBMessage r))
 stepCtrl instrs CUState = case take1 instrs of
     (Nothing, instrs') -> (CUState, instrs', Nothing)

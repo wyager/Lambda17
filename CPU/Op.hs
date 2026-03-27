@@ -1,10 +1,12 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module CPU.Op (Fetched(..), Op(..), grounded, convert) where
 
-import CLaSH.Prelude 
+import Clash.Prelude 
 import CPU.Defs (PC(..), Predicted(..), RIx(..), RVal(..), W(..), Addr(..), StationID(..))
 import qualified CPU.InstructionSet as I
 
-data Fetched op = Fetched PC (Predicted PC) op deriving (Show, Eq)
+data Fetched op = Fetched PC (Predicted PC) op deriving (Show, Eq, Generic, NFDataX)
 
 -- rix is either RIx (for instrs still in the buffer)
 -- or RobID (for instrs that have been dispatched)
@@ -15,7 +17,7 @@ data Op rix = Mov W RIx
             | Ld  (RVal rix) RIx
             | Ldr (RVal rix) (RVal rix) RIx
             | Jeq (RVal rix) (RVal rix) PC
-            deriving (Eq, Show)
+            deriving (Eq, Show, Generic, NFDataX)
 
 grounded :: Op a -> Bool
 grounded op = case op of

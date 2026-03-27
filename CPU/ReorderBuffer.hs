@@ -1,6 +1,8 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 module CPU.ReorderBuffer (ROB(..), Waiting(..), oneFree, twoFree, robInsert, empty, robPop) where
 
-import CLaSH.Prelude hiding (empty, take)
+import Clash.Prelude hiding (empty, take)
 import CPU.Defs (StationID, RobID(..))
 import CPU.Op (Op, Fetched)
 import CPU.Buffer (Buffer, intStats, full, insert', take)
@@ -8,11 +10,11 @@ import qualified CPU.Buffer as Buf
 
 data ROB r = ROB {buf   :: (Buffer r (Waiting r)),
                   first :: (RobID r),
-                  next  :: (RobID r)} deriving (Show, Eq)
+                  next  :: (RobID r)} deriving (Show, Eq, Generic, NFDataX)
 
 data Waiting r = Waiting (Fetched (Op (RobID r))) 
                | Done    (Fetched (Op (RobID r))) 
-               deriving (Show, Eq)
+               deriving (Show, Eq, Generic, NFDataX)
 
 empty :: KnownNat r => ROB r
 empty = ROB Buf.empty (RobID 0) (RobID 0)
