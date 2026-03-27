@@ -45,7 +45,7 @@ adapter :: Clk
         -> S (Vec DispatchPerCycle (BitVector 16))
         -> S Out
 adapter loadEns loads fetchEns fetches =
-    bundle (loadReqEn, loadReqBits, fetchReqEn, fetchReqBits, halt', backups')
+    bundle (loadReqEn, loadReqBits, fetchReqEn, fetchReqBits, haltL, backupsL)
     where
     mkMemRead :: Bit -> BitVector 16 -> MemRead
     mkMemRead 1 w = ReadSome (W w)
@@ -65,6 +65,12 @@ adapter loadEns loads fetchEns fetches =
     halt2Bits DoHalt = True
     halt2Bits DontHalt = False
     backups' = (\(BackupRegs regs) -> map (\(W x) -> x) regs) <$> backups
+    -- Latch halt; freeze backup snapshot once halted. cpu keeps running
+    -- after Halt (Playground.cpu's state' is `error` on Stop, and
+    -- commitN restarts with OK each cycle) so backups' is undefined
+    -- on post-Halt cycles.
+    haltL = register False (haltL .||. halt')
+    backupsL = register (repeat 0) (mux haltL backupsL backups')
 
 topEntity :: Clock System -> Reset System
           -> S (Vec LDUs Bit)

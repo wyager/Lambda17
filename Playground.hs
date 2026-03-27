@@ -127,7 +127,7 @@ cpu (CPUState opBuffer regFile stations rob fustates backups fetching) reads fet
     state' = case action of
         OK      -> CPUState opBuffer'' regFile'' stations''' rob''' fustates' backups' fetching'
         Jump pc -> reset pc backups'
-        Stop    -> error "Trying to run after a halt!"
+        Stop    -> CPUState opBuffer regFile stations rob fustates backups fetching  -- freeze, not error
     debug = state'
 
 reset :: forall l l' f f' c c' rh ob rb ds . (FUsC l l' f f' c c' rh, KnownNat ob, KnownNat rb) 
